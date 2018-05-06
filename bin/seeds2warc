@@ -1,0 +1,37 @@
+#!python
+
+import sys
+import logging
+import argparse
+
+def process_arguments(args):
+
+    parser = argparse.ArgumentParser(prog="{}".format(args[0]),
+        description='Produces a WARC from the seeds of an Archive-It collection.',
+        formatter_class=argparse.RawTextHelpFormatter)
+
+    parser.add_argument('-c', '--collection_id', dest='collection_id',
+        required=True, help="The identifier of the Archive-It collection to download")
+
+    parser.add_argument('-o', '--output', dest='output_filename',
+        required=True, help="The filename of the WARC to which the collection seeds will be written")
+
+    args = parser.parse_args()
+
+    return args
+
+if __name__ == '__main__':
+
+    args = process_arguments(sys.argv)
+
+    logger = logging.getLogger()
+    loglevel = logging.INFO
+    logging.basicConfig( 
+        format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+        level=loglevel)
+
+    logger.info("Starting Archive-It seed mementos to WARC")
+    logger.info("Using collection ID {}".format(args.collection_id))
+    logger.info("Data will be written out to {}".format(args.output_filename))
+
+    logger.info("Finished run")
