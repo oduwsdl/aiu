@@ -26,7 +26,8 @@ setup(
     install_requires=[
         'requests_futures',
         'warcio',
-        'requests'
+        'requests',
+        'bs4'
     ],
     # setup_requires=['nltk'],
     test_suite="tests",
