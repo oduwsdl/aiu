@@ -6,6 +6,8 @@ import argparse
 import random
 import multiprocessing
 
+from datetime import datetime
+
 from requests_futures.sessions import FuturesSession
 from requests.exceptions import ConnectionError, TooManyRedirects
 from warcio.warcwriter import WARCWriter
@@ -316,6 +318,9 @@ if __name__ == '__main__':
 
                 response = futures[raw_urim].result()
 
+                linkdict = convert_LinkTimeMap_to_dict(response.headers["link"])
+                urir = linkdict["original_uri"]
+
                 headers_list = response.raw.headers.items()
 
                 # sometimes, via redirects, the different URI-Ms end up at the 
@@ -328,14 +333,33 @@ if __name__ == '__main__':
                     str(response.status_code),
                     headers_list, 
                     protocol="HTTP/1.1")
+                
+                #TODO: don't we want the MDT of the URI-M, not the raw URI-M discovered at the end of the redirect chain?
+                mdt = datetime.strptime(
+                    response.headers['memento-datetime'],
+                    "%a, %d %b %Y %H:%M:%S GMT").strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"
+                    )
+                nowdate = datetime.now().strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                )
 
                 logger.info("generated the following HTTP response headers: {}".format(http_headers))
                 logger.info("using the following content: {}".format(response.raw))
 
                 for urim in invert_raw_urimdata_mapping[raw_urim]:
                     logger.info("writing out WARC record for URI-M {}".format(urim))
-                    record = writer.create_warc_record(urim, 'response', 
-                        payload=response.raw, http_headers=http_headers)
+                        
+                    warc_headers_dict = {
+                        "WARC-Date": mdt,
+                        "WARC-Creation-Date": nowdate,
+                        "WARC-Source-URI": raw_urim,
+                        "WARC-Source-URI-Orig": urim
+                    }
+
+                    record = writer.create_warc_record(urir, 'response', 
+                        payload=response.raw, http_headers=http_headers,
+                        warc_headers_dict=warc_headers_dict)
 
                     writer.write_record(record)
 
