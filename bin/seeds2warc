@@ -12,6 +12,7 @@ from warcio.warcwriter import WARCWriter
 from warcio.statusandheaders import StatusAndHeaders
 
 from aiu import ArchiveItCollection
+from aiu import convert_LinkTimeMap_to_dict
 
 logger = logging.getLogger(__name__)
 
@@ -178,9 +179,24 @@ def discover_raw_urims(urimlist, futures=None):
 
     return raw_urimdata, errordata
 
+def list_generator(input_list):
+    """This function generates the next item in a list. It is useful for lists
+    that have their items deleted while one is iterating through them.
+    """
+
+    logger.debug("list generator called")
+
+    while len(input_list) > 0:
+        for item in input_list:
+            logger.debug("list now has {} items".format(len(input_list)))
+            logger.debug("yielding {}".format(item))
+            yield item
+
 if __name__ == '__main__':
 
     args = process_arguments(sys.argv)
+
+    timemap_data = {}
 
     logger = logging.getLogger()
     loglevel = logging.INFO
@@ -192,16 +208,144 @@ if __name__ == '__main__':
     logger.info("Using collection ID {}".format(args.collection_id))
     logger.info("Data will be written out to {}".format(args.output_filename))
 
+    # 1. get seeds for Archive-It collection
     aic = ArchiveItCollection(collection_id=args.collection_id)
     seed_uris = aic.list_seed_uris()
+
+    # 2. get list of URI-Ts
     urit_list = generate_archiveit_urits(args.collection_id, seed_uris)
+
+    with FuturesSession(max_workers=cpu_count) as session:
+        futures = get_uri_responses(session, urit_list)
+
+    working_uri_list = list(futures.keys())
+
+    for urit in list_generator(working_uri_list):
+
+        logging.debug("checking if URI-T {} is done downloading".format(urit))
+
+        if futures[urit].done():
+
+            logger.debug("URI-T {} is done, extracting content".format(urit))
+
+            try:
+                response = futures[urit].result()
+
+                http_status = response.status_code
+
+                if http_status == 200:
+
+                    timemap_content = response.text
+                    timemap_headers = dict(response.headers)
+                    timemap_headers["http-status"] = http_status
+
+                    logger.info("adding TimeMap content for URI-T {}".format(urit))
+                    # logger.debug("Content: {}".format(timemap_content))
+                    # logger.debug("Headers: {}".format(
+                    #     pprint.pformat(timemap_headers)
+                    #     ))
+
+                    timemap_data[urit] = convert_LinkTimeMap_to_dict(timemap_content, skipErrors=True)
+
+                # TODO: else store connection errors in CollectionModel
+                working_uri_list.remove(urit)
+            
+            except ConnectionError:
+
+                logger.warning("There was a connection error while attempting "
+                    "to download URI-T {}".format(urit))
+
+                # TODO: store connection errors in CollectionModel
+                working_uri_list.remove(urit)
+
+            except TooManyRedirects:
+
+                logger.warning("There were too many redirects while attempting "
+                    "to download URI-T {}".format(urit))
+
+                # TODO: store connection errors in CollectionModel
+                working_uri_list.remove(urit)
+
+    urims = []
+
+    for urit in timemap_data:
+
+        timemap = timemap_data[urit]
+
+        try:
+            for memento in timemap["mementos"]["list"]:
+                # raw_urim = generate_raw_urim(memento["uri"])
+                # urims.append(raw_urim)
+                urims.append(memento["uri"])
+        except Exception as e:
+            logger.error("Error encountered processing TimeMap at {}".format(urit))
+            logger.error("TimeMap Object: {}".format(timemap))
+            raise e
+
+    raw_urimdata, errordata = discover_raw_urims(urims)
+
+    invert_raw_urimdata_mapping = {}
+    raw_urims = []
+
+    for urim in raw_urimdata:
+        raw_urim = raw_urimdata[urim]
+        invert_raw_urimdata_mapping.setdefault(raw_urim, []).append( urim )
+        raw_urims.append(raw_urim)
+
+    logger.info("Issuing requests for {} raw mementos".format(len(raw_urims)))
+    
+    with FuturesSession(max_workers=cpu_count) as session:
+        futures = get_uri_responses(session, raw_urims)
 
     with open(args.output_filename, 'wb') as output:
         writer = WARCWriter(output, gzip=True)
 
-        # 1. fetches each URI-T
-        # 2. fetches the mementos referenced by the URI-T
-        # 3. saves those mementos to a WARC
+        completed_raw_urims = []
+        leftovers = list(set(raw_urims) - set(completed_raw_urims))
 
+        while len(leftovers) > 0:
+
+            raw_urim = random.choice(leftovers)
+
+            logger.info("Processing raw URI-M {} associated with URI-M {}".format(
+                raw_urim, invert_raw_urimdata_mapping[raw_urim]))
+
+            if futures[raw_urim].done():
+
+                logger.info("Raw URI-M {} is done".format(raw_urim))
+
+                response = futures[raw_urim].result()
+
+                http_status = response.status_code
+                # memento_content = bytes(response.text, 'utf8')
+                memento_content = response.raw
+                memento_headers = dict(response.headers)    
+                memento_headers["http-status"] = http_status
+
+                # sometimes, via redirects, the different URI-Ms end up at the 
+                # same raw URI-M
+                logger.info("There are {} URI-Ms leading to raw URI-M {}".format(
+                    len(invert_raw_urimdata_mapping[raw_urim]), raw_urim
+                ))
+
+                http_headers = StatusAndHeaders(
+                    memento_headers["http-status"], memento_headers.items(), 
+                    protocol="HTTP/1.1")
+
+                for urim in invert_raw_urimdata_mapping[raw_urim]:
+                    record = writer.create_warc_record(urim, 'response', 
+                        payload=memento_content, http_headers=http_headers)
+
+                    writer.write_record(record)
+
+                    # collectionmodel.addMemento(urim, memento_content, memento_headers)
+
+                logger.debug("Removing raw URI-M {} from processing list".format(raw_urim))
+
+                completed_raw_urims.append(raw_urim)
+
+            leftovers = list(set(raw_urims) - set(completed_raw_urims))
+
+        # TODO: what to do with errordata?
 
     logger.info("Finished run")

@@ -27,7 +27,8 @@ setup(
         'requests_futures',
         'warcio',
         'requests',
-        'bs4'
+        'bs4',
+        'html5lib'
     ],
     # setup_requires=['nltk'],
     test_suite="tests",
