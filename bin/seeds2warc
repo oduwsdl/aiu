@@ -92,7 +92,7 @@ def get_uri_responses(session, raw_uris):
 
         logger.debug("issuing GET on uri {}".format(uri))
 
-        futures[uri] = session.get(uri)
+        futures[uri] = session.get(uri, stream=True)
 
     return futures
 
@@ -316,11 +316,7 @@ if __name__ == '__main__':
 
                 response = futures[raw_urim].result()
 
-                http_status = response.status_code
-                # memento_content = bytes(response.text, 'utf8')
-                memento_content = response.raw
-                memento_headers = dict(response.headers)    
-                memento_headers["http-status"] = http_status
+                headers_list = response.raw.headers.items()
 
                 # sometimes, via redirects, the different URI-Ms end up at the 
                 # same raw URI-M
@@ -329,12 +325,17 @@ if __name__ == '__main__':
                 ))
 
                 http_headers = StatusAndHeaders(
-                    memento_headers["http-status"], memento_headers.items(), 
+                    str(response.status_code),
+                    headers_list, 
                     protocol="HTTP/1.1")
 
+                logger.info("generated the following HTTP response headers: {}".format(http_headers))
+                logger.info("using the following content: {}".format(response.raw))
+
                 for urim in invert_raw_urimdata_mapping[raw_urim]:
+                    logger.info("writing out WARC record for URI-M {}".format(urim))
                     record = writer.create_warc_record(urim, 'response', 
-                        payload=memento_content, http_headers=http_headers)
+                        payload=response.raw, http_headers=http_headers)
 
                     writer.write_record(record)
 
@@ -347,5 +348,6 @@ if __name__ == '__main__':
             leftovers = list(set(raw_urims) - set(completed_raw_urims))
 
         # TODO: what to do with errordata?
+    logger.info("Data has been written out to {}".format(args.output_filename))
 
     logger.info("Finished run")
