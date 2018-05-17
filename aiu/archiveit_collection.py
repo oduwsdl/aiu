@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """
-otmt.archiveit_collection
+aiu.archiveit_collection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 This module acquires data about an Archvie-It collection both from its results
