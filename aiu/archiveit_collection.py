@@ -7,9 +7,6 @@ aiu.archiveit_collection
 This module acquires data about an Archvie-It collection both from its results
 pages and its CSV seed report.
 
-Note: In addition to being used as a library, this file can be run standalone
-to download and extract information about an Archive-It collection.
-
 Note: There be dragons here. This code was originally written for a different 
 project. I'm sure it can be improved.
 """
@@ -25,6 +22,8 @@ import sys
 
 from datetime import datetime
 from bs4 import BeautifulSoup
+
+from .version import user_agent_string
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ def fetch_collection_web_page(collection_id, pages_dir):
     logger.debug("fetching page at {}".format(collection_uri))
 
     # get first page
-    r = requests.get(collection_uri)
+    r = requests.get(collection_uri, headers={'user-agent': user_agent_string})
 
     logger.debug("writing content to {}".format("{}/1.html".format(pages_dir)))
 
@@ -105,7 +104,7 @@ def get_next_collection_page(collection_id, pages_dir, page_number=1,
 
         logger.debug("downloading data for page {}".format(page_number))
 
-        r = requests.get(page_uri)
+        r = requests.get(page_uri, headers={'user-agent': user_agent_string})
         pagedata = r.text
 
         logger.debug("saving data from page {}".format(page_number))
@@ -152,7 +151,7 @@ def get_metadata_timestamp(collection_id, pages_dir, use_cache=True):
 
         collection_uri = "{}/{}".format(collection_uri_prefix, collection_id) 
 
-        r = requests.get(collection_uri)
+        r = requests.get(collection_uri, headers={'user-agent': user_agent_string})
         pagedata = r.text
 
         with open("{}/1.html".format(pages_dir), 'w') as page:
@@ -211,7 +210,7 @@ def get_result_count(collection_id, pages_dir, use_cache=True):
 
         collection_uri = "{}/{}".format(collection_uri_prefix, collection_id) 
 
-        r = requests.get(collection_uri)
+        r = requests.get(collection_uri, headers={'user-agent': user_agent_string})
         pagedata = r.text
 
         with open("{}/1.html".format(pages_dir), 'w') as page:
@@ -262,7 +261,7 @@ def get_page_count(collection_id, pages_dir, use_cache=True):
 
         collection_uri = "{}/{}".format(collection_uri_prefix, collection_id) 
 
-        r = requests.get(collection_uri)
+        r = requests.get(collection_uri, headers={'user-agent': user_agent_string})
         pagedata = r.text
 
         with open("{}/1.html".format(pages_dir), 'w') as page:
@@ -511,7 +510,7 @@ def get_seed_metadata_from_seed_report(collection_id, pages_dir, use_cache=True)
    
     if not os.path.exists(seed_report_filename):
 
-        r = requests.get(seed_report_uri)
+        r = requests.get(seed_report_uri, headers={'user-agent': user_agent_string})
 
         with open(seed_report_filename, 'w') as seed_report:
             seed_report.write(r.text)
@@ -886,49 +885,3 @@ class ArchiveItCollection:
         with open(filename, 'w') as metadata_file:
             json.dump(collection_metadata, metadata_file, indent=4)
 
-# if __name__ == "__main__":
-
-#     if os.path.exists('logging.ini'):
-#         logging.config.fileConfig('logging.ini')
-
-#     # logger = logging.getLogger(__name__) 
-
-#     logger.info("beginning execution...")
-
-#     parser = argparse.ArgumentParser(sys.argv)
-#     parser = argparse.ArgumentParser(description="Download all public content "
-#         "about an Archive-It Collection")
-
-#     requiredArguments = parser.add_argument_group("required arguments")
-
-#     parser.add_argument("collection",
-#         help="the number of the Archive-It collection for which to collect data"
-#         )
-
-#     parser.add_argument("output",
-#         help="the output file in which to store the collection data"
-#         )
-
-#     parser.add_argument("--overwrite", dest="overwrite", default=False,
-#         help="do not use cached data in working directory, overwrite it")
-
-
-#     parser.add_argument("--working", dest="working_directory",
-#         help="the directory containing the cached data stored while "
-#         "working with the collection, default is /tmp/archiveit_data",
-#         default="/tmp/archiveit_data")
-    
-#     args = parser.parse_args()
-
-#     logger.info("overwrite: {}".format(args.overwrite))
-
-#     aic = ArchiveItCollection( args.collection, 
-#         working_directory=args.working_directory, 
-#         use_cached=(not args.overwrite),
-#         logger=logger )
-
-#     logger.info("saving output to {}".format(args.output))
-#     aic.save_all_metadata_to_file(args.output)
-
-#     logger.info("finished execution for collection {}".format(
-#         args.collection))

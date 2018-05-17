@@ -9,6 +9,7 @@ import getpass
 import json
 import multiprocessing
 import random
+import requests
 
 from datetime import datetime
 
@@ -117,6 +118,8 @@ def fetch_mementos_and_write_warcs(timemap_data, working_directory, collection_i
     output_filename = "{}-{}.warc.gz".format(warc_filename_stem, incrementor)
     output = open(output_filename, 'wb')
     writer = WARCWriter(output, gzip=True)
+    record = writer.create_warcinfo_record(os.path.basename(output_filename), warcinfo)
+    writer.write_record(record)
 
     while len(leftovers) > 0:
 
@@ -128,8 +131,7 @@ def fetch_mementos_and_write_warcs(timemap_data, working_directory, collection_i
             output = open(output_filename, 'wb')
             writer = WARCWriter(output, gzip=True)
             logger.info("writing out 'warcinfo' record")
-            record = writer.create_warcinfo_record(
-                args.output_filename, warcinfo)
+            record = writer.create_warcinfo_record(os.path.basename(output_filename), warcinfo)
             writer.write_record(record)
 
         raw_urim = random.choice(leftovers)
@@ -143,8 +145,49 @@ def fetch_mementos_and_write_warcs(timemap_data, working_directory, collection_i
 
             response = futures[raw_urim].result()
 
-            linkdict = convert_LinkTimeMap_to_dict(response.headers["link"])
-            urir = linkdict["original_uri"]
+            try:
+                linkdict = convert_LinkTimeMap_to_dict(response.headers["link"])
+                urir = linkdict["original_uri"]
+            except KeyError as e:
+                logger.warn("no original relation in the Link header for raw memento at {}".format(raw_urim))
+
+                sample_urim = invert_raw_urimdata_mapping[raw_urim][0]
+
+                with open("{}/errors.jsonl".format(error_directory), 'a') as errorsout:
+                    logger.warn("recording this at {}/errors.jsonl".format(error_directory))
+                    errorsout.write(json.dumps(
+                            {
+                                "URI-M": sample_urim,
+                                "Error": "no original relation in Link header for raw memento at {}, "
+                                    "attempted to use sample memento at {} instead".format(
+                                        urim, sample_urim
+                                    )
+                            }
+                    ))
+
+                logger.warn("attempting to acquire original relation from original URI-M at {}".format(sample_urim))
+
+                r = requests.get(sample_urim)
+
+                try:
+                    linkdict = convert_LinkTimeMap_to_dict(r.headers["link"])
+                    urir = linkdict["original_uri"]
+                except KeyError as e:
+                    logger.warn("could not process raw memento at {}, skipping...".format(raw_urim))
+
+                    with open("{}/errors.jsonl".format(error_directory), 'a') as errorsout:
+                        logger.warn("recording this at {}/errors.jsonl".format(error_directory))
+                        errorsout.write(json.dumps(
+                            {
+                                "URI-M": sample_urim,
+                                "Error": "could not process raw memento at {}, "
+                                    " no original relation in Link header at sample memento {} either".format(
+                                        urim, sample_urim
+                                    )
+                            }
+                        ))
+
+                    continue
 
             headers_list = response.raw.headers.items()
 

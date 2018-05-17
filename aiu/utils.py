@@ -1,3 +1,16 @@
+# -*- coding: utf-8 -*-
+
+"""
+aiu.utils
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This module contains functions used to download mementos and TimeMaps and 
+process them.
+
+Note: There be dragons here. This code was originally written for a different 
+project. I'm sure it can be improved.
+"""
+
 import os
 import logging
 import multiprocessing
@@ -11,16 +24,16 @@ from requests.exceptions import ConnectionError, TooManyRedirects
 
 from .archive_information import generate_raw_urim
 from .timemap import convert_LinkTimeMap_to_dict
+from .version import user_agent_string
 
 logger = logging.getLogger(__name__)
 cpu_count = multiprocessing.cpu_count()
-
 
 def get_head_responses(session, uris):
     """This function creates a futures object for each URI-M in `uris,
     using an existing `session` object from requests-futures. Only HEAD
     requests are performed.
-    """
+    """ 
 
     futures = {}
 
@@ -28,7 +41,9 @@ def get_head_responses(session, uris):
 
         logger.debug("issuing HEAD on uri {}".format(uri))
 
-        futures[uri] = session.head(uri, allow_redirects=True)
+        futures[uri] = session.head(uri, 
+            headers={'user-agent': user_agent_string},
+            allow_redirects=True)
 
     return futures
 
@@ -44,7 +59,9 @@ def get_uri_responses(session, raw_uris):
 
         logger.debug("issuing GET on uri {}".format(uri))
 
-        futures[uri] = session.get(uri, stream=True)
+        futures[uri] = session.get(uri, 
+            headers={'user-agent': user_agent_string},
+            stream=True)
 
     return futures
 
@@ -145,6 +162,9 @@ def list_generator(input_list):
             yield item
 
 def process_timemaps_for_mementos(urit_list, working_directory):
+    """This function acquires a list of mementos from a list of TimeMaps URIs.
+    The TimeMaps are stored in `working_directory`.
+    """
 
     timemap_data = {}
 
