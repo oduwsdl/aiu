@@ -226,7 +226,7 @@ def process_timemaps_for_mementos(urit_list, working_directory):
                                 {
                                     "URI-T": urit,
                                     "status": http_status,
-                                    "headers": response.headers
+                                    "headers": dict(response.headers)
                                 }
                             )))
 
