@@ -22,11 +22,13 @@ if __name__ == "__main__":
     requiredArguments = parser.add_argument_group("required arguments")
 
     parser.add_argument('-c', dest="collection",
-        help="the number of the Archive-It collection for which to collect data"
+        help="the number of the Archive-It collection for which to collect data",
+        required=True
         )
 
     parser.add_argument('-o', dest="output",
-        help="the output file in which to store the collection data"
+        help="the output file in which to store the collection data",
+        required=True
         )
 
     parser.add_argument("--overwrite", dest="overwrite", default=False,

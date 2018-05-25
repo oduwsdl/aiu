@@ -11,6 +11,8 @@ Note: There be dragons here. This code was originally written for a different
 project. I'm sure it can be improved.
 """
 
+# TODO: allow one to specify a session object from requests
+
 import os
 import json
 import requests
