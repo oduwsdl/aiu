@@ -35,9 +35,6 @@ def convert_LinkTimeMap_to_dict(timemap_text, skipErrors=False):
         first = False
         last = False
 
-        print(local_dict)
-        print(working_dict)
-
         for uri in local_dict:
 
             relation = local_dict[uri]["rel"]
