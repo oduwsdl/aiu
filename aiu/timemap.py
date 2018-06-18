@@ -35,9 +35,14 @@ def convert_LinkTimeMap_to_dict(timemap_text, skipErrors=False):
         first = False
         last = False
 
+        print(local_dict)
+        print(working_dict)
+
         for uri in local_dict:
 
             relation = local_dict[uri]["rel"]
+
+            local_memento_dict = {}
 
             if relation == "original":
                 working_dict["original_uri"] = uri
@@ -64,12 +69,10 @@ def convert_LinkTimeMap_to_dict(timemap_text, skipErrors=False):
 
                 working_dict["mementos"].setdefault("list", [])
 
-                local_memento_dict = {
-                    "datetime": None,
-                    "uri": uri
-                }
+                local_memento_dict["datetime"] = None
+                local_memento_dict["uri"] = uri
 
-            if "datetime" in local_dict[uri]:
+            if "datetime" in local_dict[uri] and "memento" in relation:
 
                 mdt = datetime.strptime(local_dict[uri]["datetime"],
                     "%a, %d %b %Y %H:%M:%S GMT")
