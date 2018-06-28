@@ -17,12 +17,14 @@ from aiu import ArchiveItCollection
 
 pp = pprint.PrettyPrinter(indent=4)
 
+cachefile = "{}/test_cache".format(os.path.dirname(os.path.realpath(__file__)))
+
 class TestArchiveItCollection(unittest.TestCase):
 
     def test_nonexistent_collection(self):
 
         logger = logging.getLogger(__name__)
-        requests_cache.install_cache('test_cache', backend='sqlite')
+        requests_cache.install_cache(cachefile, backend='sqlite')
         session = requests.Session()
 
         aic = ArchiveItCollection(2, session=session, logger=logger)
@@ -37,7 +39,7 @@ class TestArchiveItCollection(unittest.TestCase):
     def test_private_collection_12(self):
 
         logger = logging.getLogger(__name__)
-        requests_cache.install_cache('test_cache', backend='sqlite')
+        requests_cache.install_cache(cachefile, backend='sqlite')
         session = requests.Session()
 
         aic = ArchiveItCollection(12, session=session, logger=logger)
@@ -74,7 +76,7 @@ class TestArchiveItCollection(unittest.TestCase):
     def test_public_collection_6820(self):
 
         logger = logging.getLogger(__name__)
-        requests_cache.install_cache('test_cache', backend='sqlite')
+        requests_cache.install_cache(cachefile, backend='sqlite')
         session = requests.Session()
 
         aic = ArchiveItCollection(6820, session=session, logger=logger)
@@ -115,7 +117,7 @@ class TestArchiveItCollection(unittest.TestCase):
     def test_public_collection_7000(self):
 
         logger = logging.getLogger(__name__)
-        requests_cache.install_cache('test_cache', backend='sqlite')
+        requests_cache.install_cache(cachefile, backend='sqlite')
         session = requests.Session()
 
         aic = ArchiveItCollection(7000, session=session, logger=logger)
@@ -197,7 +199,7 @@ class TestArchiveItCollection(unittest.TestCase):
         self.maxDiff = None
 
         logger = logging.getLogger(__name__)
-        requests_cache.install_cache('test_cache', backend='sqlite')
+        requests_cache.install_cache(cachefile, backend='sqlite')
         session = requests.Session()
 
         aic = ArchiveItCollection(5728, session=session, logger=logger)
