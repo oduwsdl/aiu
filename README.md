@@ -4,10 +4,9 @@ Archive-It Utilties is a Python library for extracting information from Archive-
 
 ## Installation
 
-After cloning this repository, change to source code the base directory and run:
-`pip install`
+This package is called `aiu` on PyPI. Installation is handled via `pip`:
 
-The package is installed as `aiu`.
+`pip install aiu`
 
 ## Using the `ArchiveItCollection` class
 

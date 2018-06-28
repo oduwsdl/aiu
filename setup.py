@@ -36,6 +36,7 @@ setup(
     version=find_version("aiu", "version.py"),
     description='Tools for for interacting with Archive-It.',
     long_description=long_description,
+    long_description_content_type="text/markdown",
     url='https://github.com/shawnmjones/archiveit_utilities',
     author='Shawn M. Jones',
     author_email='jones.shawn.m@gmail.com',
