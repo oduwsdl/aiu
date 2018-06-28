@@ -39,15 +39,6 @@ class ArchiveItCollectionException(Exception):
     """
     pass
 
-def json_serial(obj):
-    """JSON serializer for objects not serializable by default json code
-    Thanks: https://stackoverflow.com/questions/11875770/how-to-overcome-datetime-datetime-not-json-serializable
-    """
-
-    if isinstance(obj, (datetime)):
-        return obj.isoformat()
-    raise TypeError ("Type %s not serializable" % type(obj))
-
 def scrape_main_collection_data(soup):
     """Scrapes general collection metadata the Archive-It collection
     results page using the BeautfulSoup object `soup`.
