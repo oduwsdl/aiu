@@ -9,7 +9,9 @@ import getpass
 import json
 import multiprocessing
 import random
+
 import requests
+import requests_cache
 
 from datetime import datetime
 
@@ -34,7 +36,7 @@ software_name = "seeds2warc script"
 def process_arguments(args):
 
     parser = argparse.ArgumentParser(prog="{}".format(args[0]),
-        description='Produces a WARC from the seeds of an Archive-It collection.',
+        description='*THIS SOFTWARE IS EXPERIMENTAL* Produces a WARC from the seeds of an Archive-It collection.',
         formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument('-c', '--collection_id', dest='collection_id',
@@ -42,6 +44,10 @@ def process_arguments(args):
 
     parser.add_argument('-o', '--outputdir', dest='output_directory',
         required=True, help="The directory to use when writing out the WARC")
+
+    parser.add_argument('-cf', dest="cachefile",
+        help="the SQLite file to use for caching",
+        default="/tmp/fetch_ait_metadata_cache")
 
     args = parser.parse_args()
 
@@ -247,7 +253,7 @@ if __name__ == '__main__':
         format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
         level=loglevel)
 
-    logger.info("Starting Archive-It seed mementos to WARC")
+    logger.info("Starting Archive-It seed mementos to WARC *NOTE THAT THIS IS EXPERIMENTAL CODE*")
     logger.info("Using collection ID {}".format(args.collection_id))
 
     output_directory = "{}/{}".format(args.output_directory, args.collection_id)
@@ -256,6 +262,9 @@ if __name__ == '__main__':
         os.makedirs(output_directory)
 
     logger.info("Data will be written out to {}".format(output_directory))
+
+    requests_cache.install_cache(args.cachefile, backend='sqlite')
+    session = requests.Session()
 
     # 1. get seeds for Archive-It collection
     aic = ArchiveItCollection(collection_id=args.collection_id)

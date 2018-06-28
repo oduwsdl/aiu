@@ -47,7 +47,8 @@ setup(
         'warcio',
         'requests',
         'bs4',
-        'html5lib'
+        'html5lib',
+        'requests_cache'
     ],
     # setup_requires=['nltk'],
     test_suite="tests",

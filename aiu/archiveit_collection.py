@@ -22,6 +22,8 @@ import argparse
 import csv
 import sys
 
+from io import StringIO
+
 from datetime import datetime
 from bs4 import BeautifulSoup
 
@@ -36,260 +38,6 @@ class ArchiveItCollectionException(Exception):
     source of error can be detected.
     """
     pass
-
-def fetch_collection_web_page(collection_id, pages_dir):
-    """Save the first results web page of an Archive-It collection specified by
-    `collection_id` in the working directory `pages_dir`.
-    """
-
-    collection_uri = "{}/{}".format(collection_uri_prefix, collection_id) 
-
-    logger.debug("fetching page at {}".format(collection_uri))
-
-    # get first page
-    r = requests.get(collection_uri, headers={'user-agent': user_agent_string})
-
-    logger.debug("writing content to {}".format("{}/1.html".format(pages_dir)))
-
-    with open("{}/1.html".format(pages_dir), 'w') as page:
-        page.write(r.text)
-
-    return pages_dir
-
-def fetch_collection_web_pages(collection_id, pages_dir, page_number=1, 
-    result_count=None, use_cache=True):
-    """Save all results web pages associated with an Archive-It collection
-    specified by `collection_id` into the working directory `pages_dir`,
-    starting at the page number specified by `page_number`.
-
-    This function handles pagination between results pages so that all
-    results pages can be acquired.
-    """
-
-    nextpage = get_next_collection_page(
-        collection_id, pages_dir, page_number, result_count, use_cache)
-
-    #if nextpage == None:
-    #    return
-    logger.debug("nextpage is {}".format(nextpage))
-
-    while nextpage:
-        logger.debug("nextpage is not None, it is {}".format(nextpage))
-        nextpage = get_next_collection_page(
-            collection_id, pages_dir, page_number=nextpage, 
-            result_count=result_count, use_cache=use_cache)
-
-    logger.info("all collection web pages fetched")
-
-#    fetch_collection_web_pages(collection_id, pages_dir, page_number=nextpage, 
-#        result_count=result_count, use_cache=use_cache)
-
-def get_next_collection_page(collection_id, pages_dir, page_number=1, 
-    result_count=None, use_cache=True):
-    """Parse the Archive-It results page associated with `collection_id`
-    to find the URI of the next page. Pages are stored in `pages_dir`
-    if not already downloaded.
-    """
-
-    logger.debug("result count: [{}]".format(result_count))
-    logger.debug("page_number: [{}]".format(page_number))
-
-    if int(page_number) > 1:
-        page_uri = "{}/{}/?page={}&totalResultCount={}".format(
-            collection_uri_prefix, collection_id, page_number, result_count)
-    else:
-        page_uri = "{}/{}".format(collection_uri_prefix, collection_id)
-
-    logger.debug("loading page number {} using uri [{}]".format(page_number, page_uri))
-
-    if (not os.path.exists("{}/{}.html".format(pages_dir, page_number))) or use_cache == False:
-
-        logger.debug("downloading data for page {}".format(page_number))
-
-        r = requests.get(page_uri, headers={'user-agent': user_agent_string})
-        pagedata = r.text
-
-        logger.debug("saving data from page {}".format(page_number))
-
-        with open("{}/{}.html".format(pages_dir, page_number), 'w') as page:
-            page.write(pagedata)
-
-    else:
-
-        logger.debug("loading data from page {}".format(page_number))
-
-        with open("{}/{}.html".format(pages_dir, page_number)) as page:
-            pagedata = page.read()
-
-    if '<div class="stacktrace">' in pagedata:
-        raise ArchiveItCollectionException("Archive-It Page for collection {} "
-            "contains stacktrace on page {}, refusing to continue".format(
-            page_number, collection_id))
-
-    soup = BeautifulSoup(pagedata, 'html5lib')
-
-    nextpagematch = soup.find_all('a', {'id': 'pageNext'})
-
-    logger.debug("nextpagematch: {}".format(nextpagematch))
-
-    nextpage = None
-
-    if len(nextpagematch) == 2:
-        nextpage_uri = nextpagematch[0]['href'] 
-        nextpage = nextpage_uri[nextpage_uri.find('page='):][:nextpage_uri.find('&') - 1].replace("page=", "") 
-
-    logger.debug("returning next page of {}".format(nextpage))
-
-    return nextpage
-
-def get_metadata_timestamp(collection_id, pages_dir, use_cache=True):
-    """Acquires the file timestamp of when the collection specified by 
-    `collection_id` was last downloaded, checking for the file in `pages_dir`.
-    If the file does not exist, the collection is downloaded.
-    """
-
-    if (not os.path.exists("{}/1.html".format(pages_dir))) or \
-        use_cache == False:
-
-        collection_uri = "{}/{}".format(collection_uri_prefix, collection_id) 
-
-        r = requests.get(collection_uri, headers={'user-agent': user_agent_string})
-        pagedata = r.text
-
-        with open("{}/1.html".format(pages_dir), 'w') as page:
-            page.write(pagedata)
-
-    timestamp = os.path.getmtime("{}/1.html".format(pages_dir))
-
-    return timestamp
-
-def get_seed_metadata_timestamp(collection_id, pages_dir, use_cache=True):
-    """Acquires the file timestamp of when the seed metadata specified by 
-    `collection_id` was last downloaded, checking for the file in `pages_dir`.
-    If the file does not exist, the collection is downloaded.
-    """
-
-    page_count = get_page_count(collection_id, pages_dir, use_cache=use_cache)
-
-    if page_count:
-        if int(page_count) > 1:
-            testfile = "{}/2.html".format(pages_dir)
-        else:
-            testfile = "{}/1.html".format(pages_dir)
-    else:
-        testfile = "{}/1.html".format(pages_dir)
-
-    timestamp = os.path.getmtime(testfile)
-
-    return timestamp
-
-def get_seed_report_timestamp(collection_id, pages_dir, use_cache=True):
-    """Acquries the file timestamp of the CSV seed report accessible outside
-    of the collection results page.
-    """
-
-    get_seed_metadata_from_seed_report(collection_id, pages_dir, use_cache=True)
-
-    seed_report_filename = "{}/seed_report.xt".format(pages_dir)
-
-    timestamp = os.path.getmtime(seed_report_filename)
-   
-    return timestamp 
-
-def get_result_count(collection_id, pages_dir, use_cache=True):
-    """Scrapes the nubmer of results from the Archive-It collection results
-    page.
-    """
-
-    result_count = None
-
-    logger.debug("calculating result count for cid {} using pages directory {}".format(
-        collection_id, pages_dir
-    ))
-
-    if (not os.path.exists("{}/1.html".format(pages_dir))) or \
-        use_cache == False:
-
-        collection_uri = "{}/{}".format(collection_uri_prefix, collection_id) 
-
-        r = requests.get(collection_uri, headers={'user-agent': user_agent_string})
-        pagedata = r.text
-
-        with open("{}/1.html".format(pages_dir), 'w') as page:
-            page.write(pagedata)
-
-    else:
-        with open("{}/1.html".format(pages_dir), encoding='utf8') as page:
-            pagedata = page.read()
-
-    soup = BeautifulSoup(pagedata, 'html5lib')
-
-    try:
-
-        pagestring = soup.find_all("div", "paginator")[0].text
-
-        logger.debug("pagestring: [{}]".format(pagestring))
-
-        result_count = pagestring[pagestring.find('(') + 1:].replace(' Total Results', '').rstrip(')')
-
-        result_count = pagestring[pagestring.find('(') + 1:pagestring.find(' Total Results')]
-
-    except IndexError:
-        result_count = None
-
-    logger.debug("result count before comma removal is [{}]".format(result_count))
-
-    if result_count:
-
-        result_count = result_count.replace(',', '')
-
-    logger.debug("result count is [{}]".format(result_count))
-
-    return result_count
-
-def get_page_count(collection_id, pages_dir, use_cache=True):
-    """Scrapes the page count from the Archive-It collection results
-    page.
-    """ 
-
-    logger.debug("getting page count for collection id {}, "
-        "saving to directory {}".format(collection_id, pages_dir)
-    )
-
-    page_count = None
-
-    if (not os.path.exists("{}/1.html".format(pages_dir))) or \
-        use_cache == False:
-
-        collection_uri = "{}/{}".format(collection_uri_prefix, collection_id) 
-
-        r = requests.get(collection_uri, headers={'user-agent': user_agent_string})
-        pagedata = r.text
-
-        with open("{}/1.html".format(pages_dir), 'w') as page:
-            page.write(pagedata)
-
-    else:
-        with open("{}/1.html".format(pages_dir), encoding='utf8') as page:
-            pagedata = page.read()
-
-    soup = BeautifulSoup(pagedata, 'html5lib')
-
-    try:
-
-        pagestring = soup.find_all("div", "paginator")[0].text
-
-        page_count = pagestring.split("of")[1].strip().split()[0]
-    except IndexError:
-        page_count = None
-
-    if page_count:
-        page_count = page_count.replace(',', '')
-
-    logger.debug("returning page count of [{}]".format(page_count))
-
-    return page_count
-
 
 def scrape_main_collection_data(soup):
     """Scrapes general collection metadata the Archive-It collection
@@ -393,44 +141,23 @@ def scrape_optional_collection_data(soup):
     data = {}
 
     metadata_tags = soup.find_all("div", "entity-meta")
-    moreMetadata = metadata_tags[0].find_all("div", "moreMetadata")
 
-    for item in moreMetadata[0].find_all("p"):
-        key = item.find_all("b")[0].text.replace('\xa0', '').strip().strip(':')
-        values = [i.strip(',').strip() for i in item.text.replace("{}:".format(key), '').replace('\xa0', '').replace('\t', '').strip().split('\n')]
-        key = key.lower()
-        data[key] = values
+    if len(metadata_tags) > 0:
+
+        moreMetadata = metadata_tags[0].find_all("div", "moreMetadata")
+
+        if len(moreMetadata) > 0:
+
+            for item in moreMetadata[0].find_all("p"):
+                key = item.find_all("b")[0].text.replace('\xa0', '').strip().strip(':')
+                values = [i.strip(',').strip() for i in item.text.replace("{}:".format(key), '').replace('\xa0', '').replace('\t', '').strip().split('\n')]
+                key = key.lower()
+                data[key] = values
 
     return data
 
-
-def get_metadata_from_web_page(pages_dir, data_type):
-    """Using the pages downloaded in `pages_dir`, this function returns the
-    metadata scraped based on the metadata type specified in `data_type`.
-    """
-
-    logger.info("processing collection pages from directory {}".format(pages_dir))
-
-    if os.listdir(pages_dir) == 0:
-        raise ArchiveItCollectionException("Pages directory empty, remove {} "
-            "and start over".format(pages_dir))
-
-    with open("{}/1.html".format(pages_dir), encoding='utf8') as htmlfile:
-        content = htmlfile.read()
-
-    soup = BeautifulSoup(content, 'html5lib')
-
-    if data_type == 'main':
-        return scrape_main_collection_data(soup)
-    elif data_type == 'optional':
-        return scrape_optional_collection_data(soup)
-    else:
-        raise ArchiveItCollectionException("Cannot scrape collection "
-            "metadata type {} in directory {}".format(
-            data_type, pages_dir))
-
 def scrape_seed_metadata(soup):
-    """Scrapes the seed metadata form an Archive-It results page stored in the
+    """Scrapes the seed metadata from an Archive-It results page stored in the
     BeautifulSoup object `soup`.
     """
 
@@ -457,43 +184,71 @@ def scrape_seed_metadata(soup):
                 values = [i.strip(',').strip() for i in entry.text.replace("{}:".format(key), '').replace('\xa0', '').replace('\t', '').strip().split('\n')]
                 itemdict[key.lower()] = values
 
-
         data.append(itemdict)
 
     return data
 
-def get_seed_metadata_from_web_pages(pages_dir):
-    """This function iterates through all downloaded pages in `pages_dir`
-    and extracts the seed metadata from those pages using
-    `scrape_seed_metadata`.
+def scrape_page_count(soup):
+    """Scrapes the page count from an Archive-It results page stored in the
+    BeautifulSoup object `soup`.
     """
 
-    seed_metadata = [] 
+    try:
+        pagestring = soup.find_all("div", "paginator")[0].text
+        page_count = pagestring.split("of")[1].strip().split()[0]
+        page_count = page_count.replace(',', '')
+    except IndexError:
+        page_count = None
 
-    if os.listdir(pages_dir) == 0:
-        raise ArchiveItCollectionException("Pages directory empty, remove {} "
-            "and start over".format(pages_dir))
+    return page_count
 
-    for filename in os.listdir(pages_dir):
+def scrape_page_number(soup):
+    """Scrapes the page number from an Archive-It results page stored in the
+    BeautifulSoup object `soup`.
+    """
 
-        filename = "{}/{}".format(pages_dir, filename)
+    try:
+        pagestring = soup.find_all("div", "paginator")[0].text
+        print("pagestring: {}".format(pagestring))
+        page_number = pagestring.split("of")[0].strip().split()[1]
+        page_number = page_number.replace(',', '')
+    except IndexError:
+        page_number = None
 
-        logger.debug("scraping content from {}".format(filename))
+    return page_number
 
-        with open(filename, encoding='utf8') as htmlfile:
-            content = htmlfile.read()
+def scrape_result_count(soup):
+    """Scrapes the result count from an Archive-It results page stored in the
+    BeautifulSoup object `soup`.
+    """
 
-        soup = BeautifulSoup(content, 'html5lib')
+    try:
+        pagestring = soup.find_all("div", "paginator")[0].text
+        result_count = pagestring[pagestring.find('(') + 1:].replace(' Total Results', '').rstrip(')')
+        result_count = pagestring[pagestring.find('(') + 1:pagestring.find(' Total Results')]
+        result_count = result_count.replace(',', '')
+    except IndexError:
+        result_count = None
 
-        page_seed_metadata = scrape_seed_metadata(soup)    
+    return result_count
 
-#        logger.debug("psm: {}".format(page_seed_metadata))
 
-        seed_metadata.extend(page_seed_metadata)
+def scrape_next_page_number(soup):
+    """Scrapes the Next Page URI from an Archive-It results page stored in
+    the BeautifulSoup object `soup`.
+    """
 
-    return seed_metadata
+    nextpage = None
 
-def get_seed_metadata_from_seed_report(collection_id, pages_dir, use_cache=True):
+    nextpagematch = soup.find_all('a', {'id': 'pageNext'})
+
+    if len(nextpagematch) == 2:
+        nextpage_uri = nextpagematch[0]['href'] 
+        nextpage = nextpage_uri[nextpage_uri.find('page='):][:nextpage_uri.find('&') - 1].replace("page=", "") 
+
+    return nextpage
+
+def get_seed_metadata_from_seed_report(collection_id, session):
     """Builds the CSV seed report URI using `collection_id` and saves the
     seed report in `pages_dir`.
     """
@@ -508,51 +263,41 @@ def get_seed_metadata_from_seed_report(collection_id, pages_dir, use_cache=True)
         "show_field=crawl_definition__recurrence_type&show_field=seed_type&" \
         "show_field=publicly_visible&sort=-id".format(collection_id)
 
-    seed_report_filename = "{}/seed_report.xt".format(pages_dir)
-   
-    if not os.path.exists(seed_report_filename):
+    r = session.get(seed_report_uri, headers={'user-agent': user_agent_string})
 
-        r = requests.get(seed_report_uri, headers={'user-agent': user_agent_string})
-
-        with open(seed_report_filename, 'w') as seed_report:
-            seed_report.write(r.text)
-
-    with open(seed_report_filename) as seed_report:
+    seed_report = StringIO(r.text)
     
-        csvreader = csv.DictReader(seed_report, delimiter=',')
+    csvreader = csv.DictReader(seed_report, delimiter=',')
+
+    for row in csvreader:
     
-        for row in csvreader:
-        
-            seed_metadata[ row["Seed URL"] ] = {} 
-            seed_metadata[ row["Seed URL"] ]["group"] = row["Group"]
-            seed_metadata[ row["Seed URL"] ]["status"] = row["Status"]
-            seed_metadata[ row["Seed URL"] ]["frequency"] = row["Frequency"]
-            seed_metadata[ row["Seed URL"] ]["type"] = row["Type"]
-            seed_metadata[ row["Seed URL"] ]["access"] = row["Access"]
+        seed_metadata[ row["Seed URL"] ] = {} 
+        seed_metadata[ row["Seed URL"] ]["group"] = row["Group"]
+        seed_metadata[ row["Seed URL"] ]["status"] = row["Status"]
+        seed_metadata[ row["Seed URL"] ]["frequency"] = row["Frequency"]
+        seed_metadata[ row["Seed URL"] ]["type"] = row["Type"]
+        seed_metadata[ row["Seed URL"] ]["access"] = row["Access"]
 
     return seed_metadata 
 
 class ArchiveItCollection:
     """Organizes all information acquired about the Archive-It collection."""
 
-    def __init__(self, collection_id, working_directory='/tmp/archiveit_collection',
-        use_cached=True, logger=None):
+    def __init__(self, collection_id, session=requests.Session(), logger=None):
 
         self.collection_id = str(collection_id)
-        self.working = working_directory
-        self.collection_dir = "{}/{}".format(self.working, self.collection_id)
-        self.pages_dir = "{}/pages".format(self.collection_dir)
+        self.session = session
         self.metadata_loaded = False
         self.seed_metadata_loaded = False
         self.metadata = {}
         self.seed_metadata = {}
         self.private = None
         self.exists = None
-        self.use_cached=use_cached
+
+        self.collection_uri = "{}/{}".format(collection_uri_prefix, collection_id)
+        self.firstpage_response = self.session.get(self.collection_uri)        
 
         self.logger = logger or logging.getLogger(__name__)
-
-        #self.logger.debug("instantiated class...")
 
     def load_collection_metadata(self):
         """Loads collection metadata from an existing directory, if possible.
@@ -560,32 +305,12 @@ class ArchiveItCollection:
         collection and process its metadata.
         """
 
-        #self.logger.debug("load_collection_metadata called")
-
         if not self.metadata_loaded:
 
-            self.logger.info("metadata has not yet been loaded for "
-                "collection {}".format(self.collection_id))
+            soup = BeautifulSoup(self.firstpage_response.text, 'html5lib')
 
-            if not (self.use_cached and os.path.exists(self.pages_dir)):
-
-                self.logger.debug("use cache: {}".format(self.use_cached))
-                self.logger.debug("pages directory: {}".format(self.pages_dir))
-                self.logger.debug("pages directory exists: {}".format(os.path.exists(self.pages_dir)))
-                self.logger.info("could not find cache, fetching web pages")
-
-                if not os.path.exists(self.pages_dir):
-                    os.makedirs(self.pages_dir)
-
-                fetch_collection_web_page(self.collection_id, self.pages_dir)
-
-            self.metadata["main"] = get_metadata_from_web_page(self.pages_dir, 'main')
-
-            if self.metadata["main"]["exists"]:
-                self.metadata["optional"] = get_metadata_from_web_page(self.pages_dir, 'optional')
-
-            self.metadata["metadata_timestamp"] = get_metadata_timestamp(
-                self.collection_id, self.pages_dir, self.use_cached)
+            self.metadata["main"] = scrape_main_collection_data(soup)
+            self.metadata["optional"] = scrape_optional_collection_data(soup)
 
             self.metadata_loaded = True
 
@@ -597,84 +322,69 @@ class ArchiveItCollection:
         be called if seed metadata is needed.
         """
 
-        #self.logger.debug("load_seed_metadata called")
+        self.load_collection_metadata()
+
+        if self.is_private() is True:
+            self.seed_metadata = {}
+            return
 
         if not self.seed_metadata_loaded:
-           
-            self.logger.info("seed metadata has not yet been loaded for "
-                "collection {}".format(self.collection_id))
-            self.logger.debug("caching: {}".format(self.use_cached))
 
-            page_count = get_page_count(self.collection_id, self.pages_dir, use_cache=self.use_cached)
+            timestamp = datetime.now()
 
-            self.logger.info("page count from loading is [{}]".format(page_count))
+            seed_metadata_list = []
 
-            result_count = get_result_count(self.collection_id, self.pages_dir, self.use_cached)
+            soup = BeautifulSoup(self.firstpage_response.text, 'html5lib')
 
-            self.logger.info("result count from loading is [{}]".format(result_count))
+            seed_metadata_list.extend( scrape_seed_metadata(soup) )
 
-            if result_count:
+            nextpage = scrape_next_page_number(soup)
+            result_count = scrape_result_count(soup)
 
-                self.logger.debug("result count: {}".format(result_count))
+            while nextpage:
 
-                if not (self.use_cached and os.path.exists("{}/{}.html".format(self.pages_dir, page_count))):
-    
-                    self.logger.info("could not find cache, fetching web pages for seed metadata")
-    
-                    if not os.path.exists(self.pages_dir):
-                        os.makedirs(self.pages_dir)
-    
-                    fetch_collection_web_pages(self.collection_id, self.pages_dir, 
-                        page_number=1, result_count=result_count, use_cache=self.use_cached)
-  
-                self.logger.info("scraping seed metadata from pages")
+                page_uri = "{}/{}/?page={}&totalResultCount={}".format(
+                    collection_uri_prefix, self.collection_id, 
+                    nextpage, result_count)
 
-                scraped_seed_metadata = get_seed_metadata_from_web_pages(self.pages_dir)
-  
-                self.logger.info("getting seed metadata from seed report")
+                r = self.session.get(page_uri)
 
-                seed_report_metadata = get_seed_metadata_from_seed_report(
-                    self.collection_id, self.pages_dir, use_cache=self.use_cached)
-  
-                self.logger.info("building seed metadata data structure")
+                soup = BeautifulSoup(r.text, 'html5lib')
 
-                for item in scraped_seed_metadata:
-                    uri = item["uri"]
-    
-                    #self.logger.debug("examining uri {}".format(uri))
-    
-                    itemdict = {}
-    
-                    for key in item:
-                        if key != "uri":
-                            itemdict[key] = item[key]
-    
-   
-                    self.seed_metadata.setdefault("seeds", {})
-                    self.seed_metadata["seeds"].setdefault(uri, {})
-                    self.seed_metadata["seeds"][uri].setdefault(
-                        "collection_web_pages", []).append(itemdict)
-    
-                for uri in seed_report_metadata:
-                    self.seed_metadata.setdefault("seeds", {})
-                    self.seed_metadata["seeds"].setdefault(uri, {})
-                    self.seed_metadata["seeds"][uri].setdefault("seed_report", {})
-                    self.seed_metadata["seeds"][uri]["seed_report"]= seed_report_metadata[uri]
+                seed_metadata_list.extend( scrape_seed_metadata(soup) )
 
-                self.seed_metadata["timestamps"] = {}
+                nextpage = scrape_next_page_number(soup)
 
-                self.seed_metadata["timestamps"]["seed_metadata_timestamp"] = \
-                    get_seed_metadata_timestamp(
-                        self.collection_id, self.pages_dir, self.use_cached)
-    
-                self.seed_metadata["timestamps"]["seed_report_timestamp"] = \
-                    get_seed_report_timestamp(
-                        self.collection_id, self.pages_dir, self.use_cached)
+            for item in seed_metadata_list:
+                uri = item["uri"]
 
-                self.logger.info("done building seed metadata data structure")
+                itemdict = {}
+
+                for key in item:
+                    if key != "uri":
+                        itemdict[key] = item[key]
+
+                self.seed_metadata.setdefault("seeds", {})
+                self.seed_metadata["seeds"].setdefault(uri, {})
+                self.seed_metadata["seeds"][uri].setdefault(
+                    "collection_web_pages", []).append(itemdict)
+
+            seed_report_metadata = get_seed_metadata_from_seed_report(self.collection_id, self.session)
+            seed_report_timestamp = datetime.now()
+
+            for uri in seed_report_metadata:
+                self.seed_metadata.setdefault("seeds", {})
+                self.seed_metadata["seeds"].setdefault(uri, {})
+                self.seed_metadata["seeds"][uri].setdefault("seed_report", {})
+                self.seed_metadata["seeds"][uri]["seed_report"]= seed_report_metadata[uri]
+
+            self.seed_metadata["timestamps"] = {}
+
+            self.seed_metadata["timestamps"]["seed_metadata_timestamp"] = timestamp
+
+            self.seed_metadata["timestamps"]["seed_report_timestamp"] = seed_report_timestamp
 
             self.seed_metadata_loaded = True
-
 
     def get_collection_name(self):
         """Getter for the collection name, as scraped."""
@@ -808,9 +518,7 @@ class ArchiveItCollection:
 
         metadata["exists"] = self.does_exist()
         metadata["metadata_timestamp"] = \
-            datetime.fromtimestamp(
-                self.metadata["metadata_timestamp"]
-            ).strftime("%Y-%m-%d %H:%M:%S")
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         if metadata["exists"]:
 
@@ -843,14 +551,10 @@ class ArchiveItCollection:
         if len(metadata["seed_metadata"]) > 0:
 
             metadata["seed_metadata"]["timestamps"]["seed_metadata_timestamp"] = \
-                datetime.fromtimestamp(
-                    self.seed_metadata["timestamps"]["seed_metadata_timestamp"]
-                ).strftime("%Y-%m-%d %H:%M:%S")
+                    self.seed_metadata["timestamps"]["seed_metadata_timestamp"].strftime("%Y-%m-%d %H:%M:%S")
     
             metadata["seed_metadata"]["timestamps"]["seed_report_timestamp"] = \
-                datetime.fromtimestamp(
-                    self.seed_metadata["timestamps"]["seed_report_timestamp"]
-                ).strftime("%Y-%m-%d %H:%M:%S")
+                    self.seed_metadata["timestamps"]["seed_report_timestamp"].strftime("%Y-%m-%d %H:%M:%S")
 
         return metadata
 
@@ -868,14 +572,10 @@ class ArchiveItCollection:
         if len(collection_metadata["seed_metadata"]) > 0:
 
             collection_metadata["seed_metadata"]["timestamps"]["seed_metadata_timestamp"] = \
-                datetime.fromtimestamp(
-                    self.seed_metadata["timestamps"]["seed_metadata_timestamp"]
-                ).strftime("%Y-%m-%d %H:%M:%S")
+                self.seed_metadata["timestamps"]["seed_metadata_timestamp"].strftime("%Y-%m-%d %H:%M:%S")
     
             collection_metadata["seed_metadata"]["timestamps"]["seed_report_timestamp"] = \
-                datetime.fromtimestamp(
-                    self.seed_metadata["timestamps"]["seed_report_timestamp"]
-                ).strftime("%Y-%m-%d %H:%M:%S")
+                self.seed_metadata["timestamps"]["seed_report_timestamp"].strftime("%Y-%m-%d %H:%M:%S")
 
         return collection_metadata
         

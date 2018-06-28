@@ -19,9 +19,7 @@ from warcio.statusandheaders import StatusAndHeaders
 
 from requests_futures.sessions import FuturesSession
 
-from aiu import ArchiveItCollection
 from aiu import convert_LinkTimeMap_to_dict
-from aiu import generate_archiveit_urits
 from aiu import process_timemaps_for_mementos
 from aiu import discover_raw_urims
 from aiu import get_uri_responses
@@ -35,7 +33,7 @@ software_name = "seeds2warc script"
 def process_arguments(args):
 
     parser = argparse.ArgumentParser(prog="{}".format(args[0]),
-        description='Produces a WARC from the mementos in a TimeMap.',
+        description='*THIS SOFTWARE IS EXPERIMENTAL* Produces a WARC from the mementos in a TimeMap.',
         formatter_class=argparse.RawTextHelpFormatter)
 
     parser.add_argument('-t', '--urit', dest='urit',
