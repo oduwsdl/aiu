@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/shawnmjones/archiveit_utilities.svg?branch=master)](https://travis-ci.org/shawnmjones/archiveit_utilities)
+
 # Archive-It Utilities
 
 Archive-It Utilties is a Python library for extracting information from Archive-It collections. Most work is currently done through a single class `ArchiveItCollection`, which performs screen-scraping in order to acquire general collection metadata, seed lists, and seed metadata.
