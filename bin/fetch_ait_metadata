@@ -32,10 +32,14 @@ if __name__ == "__main__":
         help="the output file in which to store the collection data",
         required=True
         )
+
+    parser.add_argument('-cf', dest="cachefile",
+        help="the SQLite file to use for caching",
+        default="/tmp/fetch_ait_metadata_cache")
     
     args = parser.parse_args()
 
-    requests_cache.install_cache('fetch_ait_metadata_cache', backend='sqlite')
+    requests_cache.install_cache(args.cachefile, backend='sqlite')
     session = requests.Session()
 
     aic = ArchiveItCollection( args.collection, session=session,

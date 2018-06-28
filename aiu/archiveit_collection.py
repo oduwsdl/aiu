@@ -39,6 +39,14 @@ class ArchiveItCollectionException(Exception):
     """
     pass
 
+def json_serial(obj):
+    """JSON serializer for objects not serializable by default json code
+    Thanks: https://stackoverflow.com/questions/11875770/how-to-overcome-datetime-datetime-not-json-serializable
+    """
+
+    if isinstance(obj, (datetime)):
+        return obj.isoformat()
+    raise TypeError ("Type %s not serializable" % type(obj))
 
 def scrape_main_collection_data(soup):
     """Scrapes general collection metadata the Archive-It collection
@@ -573,14 +581,10 @@ class ArchiveItCollection:
         if len(collection_metadata["seed_metadata"]) > 0:
 
             collection_metadata["seed_metadata"]["timestamps"]["seed_metadata_timestamp"] = \
-                datetime.fromtimestamp(
-                    self.seed_metadata["timestamps"]["seed_metadata_timestamp"]
-                ).strftime("%Y-%m-%d %H:%M:%S")
+                self.seed_metadata["timestamps"]["seed_metadata_timestamp"].strftime("%Y-%m-%d %H:%M:%S")
     
             collection_metadata["seed_metadata"]["timestamps"]["seed_report_timestamp"] = \
-                datetime.fromtimestamp(
-                    self.seed_metadata["timestamps"]["seed_report_timestamp"]
-                ).strftime("%Y-%m-%d %H:%M:%S")
+                self.seed_metadata["timestamps"]["seed_report_timestamp"].strftime("%Y-%m-%d %H:%M:%S")
 
         return collection_metadata
         
