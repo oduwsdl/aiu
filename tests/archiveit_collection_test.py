@@ -6,43 +6,26 @@ import logging.config
 import os
 import shutil
 import zipfile
+import pprint
+
+import requests
+import requests_cache
 
 from datetime import datetime
 
 from aiu import ArchiveItCollection
 
+pp = pprint.PrettyPrinter(indent=4)
+
 class TestArchiveItCollection(unittest.TestCase):
 
     def test_nonexistent_collection(self):
 
-        working_directory = "/tmp/archiveit_collection_test/testdata/archiveit_collection"
+        logger = logging.getLogger(__name__)
+        requests_cache.install_cache('test_cache', backend='sqlite')
+        session = requests.Session()
 
-        if not os.path.exists(working_directory):
-            os.makedirs(working_directory)
-
-        testdatafile="{}/testdata/ac2.zip".format(
-            os.path.dirname(os.path.realpath(__file__))
-        )
-
-        zipref = zipfile.ZipFile(testdatafile, 'r')
-        zipref.extractall(working_directory)
-        zipref.close()
-
-        logger = logging.getLogger(__name__) 
-
-        aic = ArchiveItCollection(2, working_directory=working_directory, use_cached=True)
-
-        metadata = aic.return_collection_metadata_dict()
-
-        self.assertFalse(metadata["exists"])
-        self.assertEqual(metadata["id"], '2')
-
-        logger.debug("testing for existence of working directory {}".format(
-            working_directory))
-
-        self.assertTrue(os.path.exists(working_directory))
-
-        aic = ArchiveItCollection("2", working_directory=working_directory, use_cached=True)
+        aic = ArchiveItCollection(2, session=session, logger=logger)
 
         metadata = aic.return_collection_metadata_dict()
 
@@ -51,24 +34,13 @@ class TestArchiveItCollection(unittest.TestCase):
 
         self.assertFalse(aic.does_exist())
 
-        shutil.rmtree(working_directory)
-
     def test_private_collection_12(self):
 
-        working_directory = "/tmp/archiveit_collection_test/testdata/archiveit_collection"
+        logger = logging.getLogger(__name__)
+        requests_cache.install_cache('test_cache', backend='sqlite')
+        session = requests.Session()
 
-        if not os.path.exists(working_directory):
-            os.makedirs(working_directory)
-
-        testdatafile="{}/testdata/ac12.zip".format(
-            os.path.dirname(os.path.realpath(__file__))
-        )
-
-        zipref = zipfile.ZipFile(testdatafile, 'r')
-        zipref.extractall(working_directory)
-        zipref.close()
-
-        aic = ArchiveItCollection(12, working_directory=working_directory, use_cached=True)
+        aic = ArchiveItCollection(12, session=session, logger=logger)
 
         metadata = aic.return_collection_metadata_dict()
         
@@ -99,24 +71,13 @@ class TestArchiveItCollection(unittest.TestCase):
 
         self.assertEqual(seed_metadata["seed_metadata"], {})
 
-        shutil.rmtree(working_directory)
-
     def test_public_collection_6820(self):
 
-        working_directory = "/tmp/archiveit_collection_test/testdata/archiveit_collection"
+        logger = logging.getLogger(__name__)
+        requests_cache.install_cache('test_cache', backend='sqlite')
+        session = requests.Session()
 
-        if not os.path.exists(working_directory):
-            os.makedirs(working_directory)
-
-        testdatafile="{}/testdata/ac6820.zip".format(
-            os.path.dirname(os.path.realpath(__file__))
-        )
-
-        zipref = zipfile.ZipFile(testdatafile, 'r')
-        zipref.extractall(working_directory)
-        zipref.close()
-
-        aic = ArchiveItCollection(6820, working_directory=working_directory, use_cached=True)
+        aic = ArchiveItCollection(6820, session=session, logger=logger)
 
         metadata = aic.return_collection_metadata_dict()
 
@@ -151,24 +112,13 @@ class TestArchiveItCollection(unittest.TestCase):
         self.assertFalse(aic.is_private())
         self.assertTrue(aic.does_exist())
 
-        shutil.rmtree(working_directory)
-
     def test_public_collection_7000(self):
 
-        working_directory = "/tmp/archiveit_collection_test/testdata/archiveit_collection"
+        logger = logging.getLogger(__name__)
+        requests_cache.install_cache('test_cache', backend='sqlite')
+        session = requests.Session()
 
-        if not os.path.exists(working_directory):
-            os.makedirs(working_directory)
-
-        testdatafile="{}/testdata/ac7000.zip".format(
-            os.path.dirname(os.path.realpath(__file__))
-        )
-
-        zipref = zipfile.ZipFile(testdatafile, 'r')
-        zipref.extractall(working_directory)
-        zipref.close()
-
-        aic = ArchiveItCollection(7000, working_directory=working_directory, use_cached=True)
+        aic = ArchiveItCollection(7000, session=session, logger=logger)
 
         metadata = aic.return_collection_metadata_dict()
 
@@ -242,24 +192,15 @@ class TestArchiveItCollection(unittest.TestCase):
         self.assertFalse(aic.is_private())
         self.assertTrue(aic.does_exist())
 
-        shutil.rmtree(working_directory)
-
     def test_public_collection_5728(self):
 
-        working_directory = "/tmp/archiveit_collection_test/testdata/archiveit_collection"
+        self.maxDiff = None
 
-        if not os.path.exists(working_directory):
-            os.makedirs(working_directory)
+        logger = logging.getLogger(__name__)
+        requests_cache.install_cache('test_cache', backend='sqlite')
+        session = requests.Session()
 
-        testdatafile="{}/testdata/ac5728.zip".format(
-            os.path.dirname(os.path.realpath(__file__))
-        )
-
-        zipref = zipfile.ZipFile(testdatafile, 'r')
-        zipref.extractall(working_directory)
-        zipref.close()
-
-        aic = ArchiveItCollection(5728, working_directory=working_directory, use_cached=True)
+        aic = ArchiveItCollection(5728, session=session, logger=logger)
 
         metadata = aic.return_collection_metadata_dict()
 
@@ -289,6 +230,8 @@ class TestArchiveItCollection(unittest.TestCase):
         seed_metadata = aic.return_seed_metadata_dict() 
 
         self.assertEqual(seed_metadata["id"], "5728")
+
+        # pp.pprint(seed_metadata["seed_metadata"]["seeds"]["http://blog.willamette.edu/mba/"])
 
         # sample seeds, because I'm too lazy to put in data for all 101
         self.assertEqual(
@@ -321,12 +264,12 @@ class TestArchiveItCollection(unittest.TestCase):
                 'collection_web_pages': [ {
                     'title': 'Willamette World News',
                     'description': ['Blog for International Education at Willamette University.'],
-                    'videos': ['93 Videos Captured']
+                    'videos': ['96 Videos Captured']
                     } ],
                 'seed_report': {
                     'group': '',
                     'status': 'True',
-                    'frequency': 'BIMONTHLY',
+                    'frequency': 'ANNUAL',
                     'type': 'normal',
                     'access': 'True'
                 }
@@ -339,12 +282,12 @@ class TestArchiveItCollection(unittest.TestCase):
         )
 
         self.assertEqual(
-            seed_metadata["seed_metadata"]["seeds"]["http://www.facebook.com/WillametteAlumni/"],
+            seed_metadata["seed_metadata"]["seeds"]["https://www.facebook.com/WillametteAlumni/"],
             {
                 'collection_web_pages': [ {
                     'title': 'Alumni Association Facebook',
                     'description': ["Facebook page for Willamette University's Alumni Association."],
-                    'videos': ['859 Videos Captured'],
+                    'videos': ['1123 Videos Captured'],
                     'group': ['Facebook'] } ],
                 'seed_report': {
                     'group': 'Facebook',
@@ -356,20 +299,9 @@ class TestArchiveItCollection(unittest.TestCase):
         )
 
         self.assertEqual(
-            aic.get_seed_metadata("http://www.facebook.com/WillametteAlumni/"),
-            seed_metadata["seed_metadata"]["seeds"]["http://www.facebook.com/WillametteAlumni/"]
+            aic.get_seed_metadata("https://www.facebook.com/WillametteAlumni/"),
+            seed_metadata["seed_metadata"]["seeds"]["https://www.facebook.com/WillametteAlumni/"]
         )
 
         self.assertFalse(aic.is_private())
         self.assertTrue(aic.does_exist())
-
-        shutil.rmtree(working_directory)
-
-# if __name__ == '__main__':
-
-#     logging.config.fileConfig('logging.ini')
-#     logger = logging.getLogger(__name__) 
-
-#     logger.info("beginning unit tests")
-
-#     unittest.main()
