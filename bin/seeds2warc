@@ -19,6 +19,10 @@ from warcio.warcwriter import WARCWriter
 from warcio.statusandheaders import StatusAndHeaders
 
 from requests_futures.sessions import FuturesSession
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
+import aiu
 
 from aiu import ArchiveItCollection
 from aiu import convert_LinkTimeMap_to_dict
@@ -102,8 +106,20 @@ def fetch_mementos_and_write_warcs(timemap_data, working_directory, collection_i
         raw_urims.append(raw_urim)
 
     logger.info("Issuing requests for {} raw mementos".format(len(raw_urims)))
-    
-    with FuturesSession(max_workers=cpu_count) as session:
+  
+    retry_session = requests.Session()
+    retry = Retry(
+        total=10,
+        read=10,
+        connect=10,
+        backoff_factor=0.3,
+        status_forcelist=(500, 502, 504)
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    retry_session.mount('http://', adapter)
+    retry_session.mount('https://', adapter)  
+
+    with FuturesSession(max_workers=cpu_count, session=retry_session) as session:
         futures = get_uri_responses(session, raw_urims)
 
     warcinfo = {
@@ -152,9 +168,10 @@ def fetch_mementos_and_write_warcs(timemap_data, working_directory, collection_i
             response = futures[raw_urim].result()
 
             try:
+                # TODO: if the original URI used a Link header, it will be overridden
                 linkdict = convert_LinkTimeMap_to_dict(response.headers["link"])
                 urir = linkdict["original_uri"]
-            except KeyError as e:
+            except (KeyError, aiu.timemap.MalformedLinkFormatTimeMap) as e:
                 logger.warn("no original relation in the Link header for raw memento at {}".format(raw_urim))
 
                 sample_urim = invert_raw_urimdata_mapping[raw_urim][0]
