@@ -221,8 +221,6 @@ def draw_both_axes_pct_growth(
     label = ax.plot(mdts_pct, urirs_pct, label="% seeds", color="#00ff00", linewidth=3.0)
     labels.append(label)
 
-#     ax.plot([0, 1], [0, 1], color="#000000", linewidth=2.0)
-
     if shape_percentage_of_whole:
         assert whole_text_x
         assert whole_text_y
@@ -262,8 +260,6 @@ def draw_both_axes_pct_growth(
         
     for tick in ax.yaxis.get_major_ticks():
         tick.label.set_fontsize(16)
-
-#     plt.grid()
 
     handles, labels = ax.get_legend_handles_labels()
     lgd = ax.legend(handles, labels, loc="upper left", fontsize=20)
@@ -536,6 +532,9 @@ def process_timemaps_for_mementos(urit_list):
                 working_uri_list.remove(urit)
 
     return timemap_data, errors_data
+
+def get_collection_metadata_and_timemaps(collection_id):
+    pass
 
 if __name__ == '__main__':
 

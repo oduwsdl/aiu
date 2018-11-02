@@ -2,10 +2,116 @@ import sys
 import os
 import logging
 import argparse
+import json
+import multiprocessing
+
+from datetime import datetime
+
 import requests
 import requests_cache
 
+from requests_futures.sessions import FuturesSession
+from requests.exceptions import ConnectionError, TooManyRedirects
+
 from aiu import ArchiveItCollection
+from aiu import convert_LinkTimeMap_to_dict
+from aiu import generate_archiveit_urits
+from aiu import get_uri_responses
+
+cpu_count = multiprocessing.cpu_count()
+
+def dtconverter(o):
+
+    if isinstance(o, datetime):
+        return o.__str__()
+
+def list_generator(input_list):
+    """This function generates the next item in a list. It is useful for lists
+    that have their items deleted while one is iterating through them.
+    """
+
+    logger.debug("list generator called")
+
+    while len(input_list) > 0:
+        for item in input_list:
+            logger.debug("list now has {} items".format(len(input_list)))
+            logger.debug("yielding {}".format(item))
+            yield item
+
+def process_timemaps_for_mementos(urit_list):
+
+    timemap_data = {}
+    errors_data = {}
+
+    with FuturesSession(max_workers=cpu_count) as session:
+        futures = get_uri_responses(session, urit_list)
+
+    working_uri_list = list(futures.keys())
+
+    for urit in list_generator(working_uri_list):
+
+        logger.debug("checking if URI-T {} is done downloading".format(urit))
+
+        if futures[urit].done():
+
+            logger.debug("URI-T {} is done, extracting content".format(urit))
+
+            try:
+                response = futures[urit].result()
+
+                http_status = response.status_code
+
+                if http_status == 200:
+
+                    timemap_content = response.text
+
+                    logger.info("adding TimeMap content for URI-T {}".format(
+                        urit))
+
+                    timemap_data[urit] = convert_LinkTimeMap_to_dict(
+                        timemap_content, skipErrors=True)
+
+                else:
+
+                    logger.error("got a non-200 response for {}".format(urit))
+                    logger.error("response headers: {}".format(response.headers))
+                    logger.error("response text: {}".format(response.text))
+
+                    errors_data[urit] = {
+                        "type": "http_error",
+                        "data": {
+                            "message": "non-200 HTTP status",
+                            "object": response
+                        }
+                    }
+
+                working_uri_list.remove(urit)
+
+            except ConnectionError as e:
+
+                logger.warning("There was a connection error while attempting "
+                    "to download URI-T {}".format(urit))
+
+                errors_data[urit] = {
+                    "type": "exception",
+                    "data": e
+                }
+                
+                working_uri_list.remove(urit)
+
+            except TooManyRedirects as e:
+
+                logger.warning("There were too many redirects while attempting "
+                    "to download URI-T {}".format(urit))
+
+                errors_data[urit] = {
+                    "type": "exception",
+                    "data": e
+                }
+
+                working_uri_list.remove(urit)
+
+    return timemap_data, errors_data
 
 if __name__ == "__main__":
 
@@ -33,6 +139,10 @@ if __name__ == "__main__":
         required=True
         )
 
+    parser.add_argument('-tm', dest='include_timemaps',
+        help="include all TimeMaps in the output",
+        action='store_true')
+
     parser.add_argument('-cf', dest="cachefile",
         help="the SQLite file to use for caching",
         default="/tmp/fetch_ait_metadata_cache")
@@ -45,8 +155,42 @@ if __name__ == "__main__":
     aic = ArchiveItCollection( args.collection, session=session,
         logger=logger )
 
-    logger.info("saving output to {}".format(args.output))
-    aic.save_all_metadata_to_file(args.output)
+    if args.include_timemaps:
+
+        logger.info("generating all general and seed metadata for collection {}".format(args.collection))
+
+        output = aic.return_all_metadata_dict()
+
+        seed_uris = aic.list_seed_uris()
+
+        urit_list = generate_archiveit_urits(args.collection, seed_uris)
+
+        logger.info("acquiring all timemap data")
+
+        timemap_data, errors_data = process_timemaps_for_mementos(urit_list)
+
+        output["timemaps"] = timemap_data
+
+        for timemap in errors_data:
+
+            if errors_data[timemap]["type"] == "http_error":
+                if errors_data[timemap]["data"]["message"] == "non-200 HTTP status":
+                    response = errors_data[timemap]["data"]["object"]
+                    errors_data[timemap]["data"]["response_headers"] = dict(response.headers)
+                    errors_data[timemap]["data"]["response_status"] = response.status_code
+                    errors_data[timemap]["data"]["response_content"] = response.text
+                    del(errors_data[timemap]["data"]["object"])
+
+        output["timemap_errors"] = errors_data
+
+        logger.info("saving metadata and timemaps to {}".format(args.output))
+
+        with open(args.output, 'w') as f:
+            json.dump(output, f, default=dtconverter, indent=4)
+
+    else:
+        logger.info("saving output to {}".format(args.output))
+        aic.save_all_metadata_to_file(args.output)
 
     logger.info("output saved to {}".format(args.output))
 
