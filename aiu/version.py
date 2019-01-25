@@ -4,4 +4,4 @@ __version__ = "0.1.1a1"
 name = __name__
 version = __version__
 
-user_agent_string = "{}/{} - See: https://github.com/shawnmjones/archiveit_utilities".format(name, version)
+user_agent_string = "{}/{} - See: https://github.com/oduwsdl/archiveit_utilities".format(name, version)

@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/shawnmjones/archiveit_utilities.svg?branch=master)](https://travis-ci.org/shawnmjones/archiveit_utilities)
+[![Build Status](https://travis-ci.org/oduwsdl/archiveit_utilities.svg?branch=master)](https://travis-ci.org/oduwsdl/archiveit_utilities)
 
 # Archive-It Utilities
 
