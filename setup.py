@@ -37,7 +37,7 @@ setup(
     description='Tools for for interacting with Archive-It.',
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url='https://github.com/shawnmjones/archiveit_utilities',
+    url='https://github.com/oduwsdl/archiveit_utilities',
     author='Shawn M. Jones',
     author_email='jones.shawn.m@gmail.com',
     license='MIT',

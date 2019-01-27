@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/shawnmjones/archiveit_utilities.svg?branch=master)](https://travis-ci.org/shawnmjones/archiveit_utilities)
+[![Build Status](https://travis-ci.org/oduwsdl/archiveit_utilities.svg?branch=master)](https://travis-ci.org/oduwsdl/archiveit_utilities)
 
 # Archive-It Utilities
 
@@ -6,7 +6,7 @@ Archive-It Utilties is a Python library for extracting information from Archive-
 
 ## Installation
 
-This package is called `aiu` on PyPI. Installation is handled via `pip`:
+This package requires Python 3 and is called `aiu` on PyPI. Installation is handled via `pip`:
 
 `pip install aiu`
 
