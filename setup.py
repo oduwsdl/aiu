@@ -42,7 +42,7 @@ setup(
     author_email='jones.shawn.m@gmail.com',
     license='MIT',
     packages=['aiu'],
-    scripts=['bin/seeds2warc', 'bin/tm2warc', 'bin/fetch_ait_metadata'],
+    scripts=['bin/seeds2warc', 'bin/tm2warc', 'bin/fetch_ait_metadata', 'bin/generate_seed_statistics'],
     install_requires=[
         'requests_futures',
         'warcio',
