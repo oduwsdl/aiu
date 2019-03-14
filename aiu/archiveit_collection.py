@@ -472,12 +472,17 @@ class ArchiveItCollection:
 
         self.load_collection_metadata()
 
-        if self.metadata["main"]["public"] == "private":
-            return True
-        elif self.metadata["main"]["public"] == "public":
-            return False
+        if self.does_exist():
+
+            if self.metadata["main"]["public"] == "private":
+                return True
+            elif self.metadata["main"]["public"] == "public":
+                return False
+            else:
+                raise ArchiveItCollectionException("Could not determine private/public status")
+
         else:
-            raise ArchiveItCollectionException("Could not determine private/public status")
+            return False
 
     def does_exist(self):
         """Returns `True` if the collection actually exists and requests for
