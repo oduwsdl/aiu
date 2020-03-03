@@ -324,6 +324,10 @@ class ArchiveItCollection:
 
         self.load_collection_metadata()
 
+        if self.does_exist() is False:
+            self.seed_metadata = {}
+            return
+
         if self.is_private() is True:
             self.seed_metadata = {}
             return
