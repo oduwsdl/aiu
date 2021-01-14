@@ -109,11 +109,22 @@ class TestTimeMapParser(unittest.TestCase):
 
         self.assertEqual( actual_json_timemap, expected_json_timemap )
 
-    # def test_example_multiple_urits_missing_quotes(self):
+    def test_example_multiple_urits_missing_quotes(self):
 
-    #     lheader = '<http://ogp.me>; rel=original, <https://perma.cc/timegate/http://ogp.me>; rel=timegate, <https://perma.cc/timemap/link/http://ogp.me>; rel=timemap; type=application/link-format, <https://perma.cc/timemap/json/http://ogp.me>; rel=timemap; type=application/json, <https://perma.cc/timemap/html/http://ogp.me>; rel=timemap; type=text/html, <https://perma.cc/7YXW-UFQ3>; rel=memento; datetime="Sun, 04 Oct 2015 23:18:13 GMT"'
+        lheader = '<http://ogp.me>; rel=original, <https://perma.cc/timegate/http://ogp.me>; rel=timegate, <https://perma.cc/timemap/link/http://ogp.me>; rel=timemap; type=application/link-format, <https://perma.cc/timemap/json/http://ogp.me>; rel=timemap; type=application/json, <https://perma.cc/timemap/html/http://ogp.me>; rel=timemap; type=text/html, <https://perma.cc/7YXW-UFQ3>; rel=memento; datetime="Sun, 04 Oct 2015 23:18:13 GMT"'
 
-    #     actual_json_timemap = convert_LinkTimeMap_to_dict(lheader, debug=False)
+        actual_json_timemap = convert_LinkTimeMap_to_dict(lheader, debug=False, noquotes=True)
 
         # print("output in test")
         # pp.pprint(actual_json_timemap)
+
+        expected_json_timemap = {   
+            'mementos': {   'list': [   {   'datetime': datetime.datetime(2015, 10, 4, 23, 18, 13),
+                                    'uri': 'https://perma.cc/7YXW-UFQ3'}]},
+            'original_uri': 'http://ogp.me',
+            'timegate_uri': 'https://perma.cc/timegate/http://ogp.me',
+            'timemap_uri': {   'json_format': 'https://perma.cc/timemap/json/http://ogp.me',
+                       'link_format': 'https://perma.cc/timemap/link/http://ogp.me'}
+        }
+        
+        self.assertEqual( actual_json_timemap, expected_json_timemap )

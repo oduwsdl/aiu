@@ -19,7 +19,7 @@ class MalformedLinkFormatTimeMap(Exception):
     """
     pass
 
-def convert_LinkTimeMap_to_dict(timemap_text, skipErrors=False, debug=False):
+def convert_LinkTimeMap_to_dict(timemap_text, skipErrors=False, debug=False, noquotes=False):
     """
         A function to convert the link format TimeMap text into a Python 
         dictionary that closely resembles the JSON specified at:
@@ -163,22 +163,53 @@ def convert_LinkTimeMap_to_dict(timemap_text, skipErrors=False, debug=False):
 
         elif state == 4:
 
-            if character == ';':
-                state = 3
-            elif character == ',':
-                state = 0
+            if noquotes == True:
 
-                process_local_dict(local_dict, dict_timemap)
+                # yup, there can still be quotes when there are no other quotes
+                if character == '"':
+                    state = 5
 
-            elif character == '"':
-                state = 5
-            elif character.isspace():
-                pass
+                elif character == ';':
+                    state = 3
+
+                    key = key.strip()
+                    value = value.strip()
+                    local_dict[uri][key] = value
+                    key = ""
+                    value = ""
+
+                elif character == ',':
+                    state = 0
+
+                    key = key.strip()
+                    value = value.strip()
+                    local_dict[uri][key] = value
+                    key = ""
+                    value = ""
+
+                    process_local_dict(local_dict, dict_timemap)
+
+                else:
+                    value += character
+
             else:
-                if not skipErrors:
-                    raise MalformedLinkFormatTimeMap(
-                        "issue at character {} while looking for value"
-                        .format(charcount))
+
+                if character == ';':
+                    state = 3
+                elif character == ',':
+                    state = 0
+
+                    process_local_dict(local_dict, dict_timemap)
+
+                elif character == '"':
+                    state = 5
+                elif character.isspace():
+                    pass
+                else:
+                    if not skipErrors:
+                        raise MalformedLinkFormatTimeMap(
+                            "issue at character {} while looking for value"
+                            .format(charcount))
 
         elif state == 5:
 
