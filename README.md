@@ -1,8 +1,8 @@
 [![Build Status](https://travis-ci.org/oduwsdl/archiveit_utilities.svg?branch=master)](https://travis-ci.org/oduwsdl/archiveit_utilities)
 
-# Archive-It Utilities
+# AIU (formerly Archive-It Utilities)
 
-Archive-It Utilties is a Python library for extracting information from Archive-It collections. Most work is currently done through a single class `ArchiveItCollection`, which performs screen-scraping in order to acquire general collection metadata, seed lists, and seed metadata.
+AIU is a Python library for extracting information from Archive-It collections. Most work is currently done through a single class `ArchiveItCollection`, which performs screen-scraping in order to acquire general collection metadata, seed lists, and seed metadata.
 
 ## Installation
 
@@ -12,7 +12,7 @@ This package requires Python 3 and is called `aiu` on PyPI. Installation is hand
 
 ## Using the `ArchiveItCollection` class
 
-The heart of Archive-It Utilities is a class named `ArchiveItCollection` that has many methods for extracting information about an Archive-It collection using its collection identifier.
+The class named `ArchiveItCollection` has many methods for extracting information about an Archive-It collection using its collection identifier.
 
 For example, to use iPython to get information about Archive-It collection number 5728, one can execute the following:
 
