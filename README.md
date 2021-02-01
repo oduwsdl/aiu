@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/oduwsdl/archiveit_utilities.svg?branch=master)](https://travis-ci.org/oduwsdl/archiveit_utilities)
+[![Build Status](https://travis-ci.org/oduwsdl/aiu.svg?branch=master)](https://travis-ci.org/oduwsdl/aiu)
 
 # AIU (formerly Archive-It Utilities)
 
