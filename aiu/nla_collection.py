@@ -86,26 +86,29 @@ def extract_main_collection_data(res):
 
         #Memento & Seed URI data
         snapshots = json_data["snapshots"]
-        urims = []
-        seed_uris = []
-        for m_id in range(0,len(snapshots)):    #
-            memento = snapshots[m_id]
-            urim = memento["url"]
-            gathered_url = memento["gatheredUrl"]
-            urims.append(urim)
-            seed_uris.append(gathered_url)
+        seed_uris, urims = get_memento(snapshots)
         data["seed_uris"]  = seed_uris
         data["urims"]  = urims
-
-
-
-
-    else:       
-        #This is a supercollection or collection which contains subcollections
+    else: #This is a supercollection or collection which contains subcollections
         if len(breadcrumbs) == 1:
             #This is a supercollection which contains collections
             data["collection_type"] = "L1 Supercollection - contains collections"
             data["subject"] = data["name"] #same as the collection name
+            supercollection_seed_uris = []
+            supercollection_urims = []
+            for sc_id in range(0,len(subcollections)):
+                sc_url = subcollections[sc_id]["collectionUrl"] 
+                sc_url_id = sc_url.split("/")[2]
+                collection_json_uri = collection_json_prefix + sc_url_id
+                res = requests.get(collection_json_uri)
+                json_data = json.loads(res.text)
+                collections = json_data["subcollections"]
+                collection_seed_uris, collection_urims = get_subcollections(collections)
+                supercollection_seed_uris.extend(collection_seed_uris)
+                supercollection_urims.extend(collection_urims)
+            #print(supercollection_urims)
+            data["seed_uris"]  = supercollection_seed_uris
+            data["urims"]  = supercollection_urims            
 
         if len(breadcrumbs) == 2:
             #This is a collection which contains subcollections 
@@ -113,7 +116,36 @@ def extract_main_collection_data(res):
             data["subject"] = breadcrumbs[1]["name"] #supercollection name
             data["archived_since"] = json_data["startDate"]["monthyear"] #other formats available
             data["archived_until"] = json_data["endDate"]["monthyear"] #other formats available
-    return data
+            collection_seed_uris, collection_urims = get_subcollections(subcollections)
+            data["seed_uris"]  = collection_seed_uris
+            data["urims"]  = collection_urims            
+    return data 
+
+def get_subcollections(subcollections):
+    collection_seed_uris = []
+    collection_urims = []
+    for sc_id in range(0,len(subcollections)):
+        sc_url = subcollections[sc_id]["collectionUrl"]
+        sc_url_id = sc_url.split("/")[2]
+        subcollection_json_uri = collection_json_prefix + sc_url_id
+        #Making a request to the sub-collection URLs
+        res = requests.get(subcollection_json_uri)
+        json_data = json.loads(res.text)
+        seed_uris, urims = get_memento(json_data["snapshots"])
+        collection_seed_uris.extend(seed_uris)
+        collection_urims.extend(urims)
+    return collection_seed_uris, collection_urims
+
+def get_memento(snapshots):
+    urims = []
+    seed_uris = []
+    for m_id in range(0,len(snapshots)):    #
+        memento = snapshots[m_id]
+        urim = memento["url"]
+        gathered_url = memento["gatheredUrl"]
+        urims.append(urim)
+        seed_uris.append(gathered_url)
+    return seed_uris, urims
 
 class NLACollection:
     """Organizes all information acquired about the NLA collection."""
