@@ -29,6 +29,8 @@ logger = logging.getLogger(__name__)
 
 collection_json_prefix = "https://webarchive.nla.gov.au/bamboo-service/collection/"
 
+nla_prefix ="https://webarchive.nla.gov.au"
+
 class NLACollectionException(Exception):
     """An exception class to be used by the functions in this file so that the
     source of error can be detected.
@@ -92,6 +94,7 @@ def extract_main_collection_data(res):
         #Memento & Seed URI data
         snapshots = json_data["snapshots"]
         seed_uris, urims = get_memento(snapshots)
+        #print(urims)
         data["seed_uris"]  = seed_uris
         data["urims"]  = urims
     else: #This is a supercollection or collection which contains subcollections
@@ -131,7 +134,8 @@ def extract_main_collection_data(res):
             data["archived_until"] = json_data["endDate"]["monthyear"] #other formats available
             collection_seed_uris, collection_urims = get_subcollections(subcollections)
             data["seed_uris"]  = collection_seed_uris
-            data["urims"]  = collection_urims            
+            data["urims"]  = collection_urims      
+            #print(collection_urims)      
     return data 
 
 def get_subcollections(subcollections):
@@ -154,7 +158,9 @@ def get_memento(snapshots):
     seed_uris = []
     for m_id in range(0,len(snapshots)):    #
         memento = snapshots[m_id]
-        urim = memento["url"]
+        #urim = memento["url"]
+        rel_urim = memento["snapshotviewurl"]
+        urim = nla_prefix + rel_urim
         gathered_url = memento["gatheredUrl"]
         urims.append(urim)
         seed_uris.append(gathered_url)
