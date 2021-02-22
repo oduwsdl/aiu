@@ -61,7 +61,7 @@ class TestNLACollection(unittest.TestCase):
         self.assertEqual(uri,"https%3A%2F%2Fwebarchive.nla.gov.au%2Fcollection%2F11666")
         self.assertEqual(subject,"Business & Economy")
         self.assertEqual(archived_since, "Nov 2006")
-        self.assertEqual(archived_until,"Jan 2021")
+        self.assertEqual(archived_until,"Feb 2021")
         self.assertEqual(collection_type,['L2 Collection - contains subcollections', [0, 15003]])
 
     def test_L3_collection_11676(self):
