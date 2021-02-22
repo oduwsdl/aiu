@@ -26,6 +26,7 @@ class TestNLACollection(unittest.TestCase):
 
         aic = aiu.NLACollection(12345, session=session, logger=logger)
         self.assertFalse(aic.does_exist())
+        session.close()	
 
     def test_L1_collection_15003(self):
         logger = logging.getLogger(__name__)
@@ -84,3 +85,21 @@ class TestNLACollection(unittest.TestCase):
         self.assertEqual(archived_until,"May 2020")
         self.assertEqual(collected_by, {'State Library of South Australia': 'http://www.slsa.sa.gov.au/', 'State Library of Western Australia': 'http://www.slwa.wa.gov.au/', 'State Library of Queensland': 'http://www.slq.qld.gov.au/', 'National Library of Australia': 'http://www.nla.gov.au/', 'State Library of Victoria': 'http://www.slv.vic.gov.au/'})
         self.assertEqual(collection_type,"L3 Subcollection - contains mementos")
+
+
+    def test_list_seed_URIs_11676(self):
+        logger = logging.getLogger(__name__)
+        requests_cache.install_cache(cachefile, backend='sqlite')
+        session = requests.Session()
+        aic = aiu.NLACollection(11676, session=session, logger=logger)
+        seed_uris = aic.list_seed_uris()
+        self.assertEqual(seed_uris, ['http://boom09.com.au/', 'http://www.socialinclusion.sa.gov.au/files/DiggingDeep.pdf', 'http://kimberleydirectaction.wordpress.com/', 'http://miningcommunities.com.au/', 'http://www.miningfm.com.au/', 'http://www.roxbydowns.com', 'https://trackingonslow.com/'])
+
+
+    def test_list_memento_urims_11676(self):
+        logger = logging.getLogger(__name__)
+        requests_cache.install_cache(cachefile, backend='sqlite')
+        session = requests.Session()
+        aic = aiu.NLACollection(11676, session=session, logger=logger)
+        memento_urims = aic.list_memento_urims()
+        self.assertEqual(memento_urims, ['http://pandora.nla.gov.au/pan/116281/20100210-1221/boom09.com.au/index.html', 'http://pandora.nla.gov.au/pan/135435/20120803-1636/www.socialinclusion.sa.gov.au/files/DiggingDeep.pdf', 'http://pandora.nla.gov.au/pan/129256/20140106-1941/kimberleydirectaction.wordpress.com/index.html', 'http://pandora.nla.gov.au/pan/133943/20120905-0000/miningcommunities.com.au/news/index.html', 'http://pandora.nla.gov.au/pan/136485/20130116-0006/www.miningfm.com.au/index.html', 'http://pandora.nla.gov.au/pan/134289/20120605-0000/www.roxbydowns.com/index.html', 'http://pandora.nla.gov.au/pan/153227/20150902-1834/trackingonslow.com/index.html'])

@@ -84,6 +84,22 @@ def extract_main_collection_data(res):
         data["archived_since"] = json_data["startDate"]["monthyear"] #other formats available
         data["archived_until"] = json_data["endDate"]["monthyear"] #other formats available
 
+        #Memento & Seed URI data
+        snapshots = json_data["snapshots"]
+        urims = []
+        seed_uris = []
+        for m_id in range(0,len(snapshots)):    #
+            memento = snapshots[m_id]
+            urim = memento["url"]
+            gathered_url = memento["gatheredUrl"]
+            urims.append(urim)
+            seed_uris.append(gathered_url)
+        data["seed_uris"]  = seed_uris
+        data["urims"]  = urims
+
+
+
+
     else:       
         #This is a supercollection or collection which contains subcollections
         if len(breadcrumbs) == 1:
@@ -100,7 +116,7 @@ def extract_main_collection_data(res):
     return data
 
 class NLACollection:
-    """Organizes all information acquired about the Archive-It collection."""
+    """Organizes all information acquired about the NLA collection."""
 
     def __init__(self, collection_id, session=requests.Session(), logger=None):
 
@@ -114,9 +130,10 @@ class NLACollection:
         self.exists = None
 
         self.collection_json_uri = "{}/{}".format(collection_json_prefix, collection_id)
-        self.res = self.session.get(self.collection_json_uri)        
+ 
 
         self.logger = logger or logging.getLogger(__name__)  
+        #self.session.close()
 
     def load_collection_metadata(self):
         """Loads collection metadata from an existing directory, if possible.
@@ -125,87 +142,72 @@ class NLACollection:
         """
 
         if not self.metadata_loaded:
-
-            # soup = BeautifulSoup(self.firstpage_response.text, 'html5lib')
-
-            self.metadata["main"] = extract_main_collection_data(self.res)
-            #self.metadata["optional"] = extract_optional_collection_data(self.res)
-
+            self.metadata["main"] = extract_main_collection_data(self.session.get(self.collection_json_uri))
+            #self.metadata["optional"] = extract_optional_collection_data(self.session.get(self.collection_json_uri))
             self.metadata_loaded = True
 
     def does_exist(self):
         """Returns `True` if the collection actually exists and requests for
-        its data did not result in 404s or soft-404s."""
+        its data did not result in HTTP 500*."""
 
         self.load_collection_metadata()
+        return self.metadata["main"]["exists"]     
 
-        exists = self.metadata["main"]["exists"]
+    def get_collection_type(self):
+        """Getter for the collection type"""
 
-        #self.logger.debug("exists is set to {}".format(exists))
-
-        return exists     
+        self.load_collection_metadata()
+        return self.metadata["main"]["collection_type"]
 
     def get_collection_name(self):
         """Getter for the collection name, as scraped."""
 
         self.load_collection_metadata()
+        return self.metadata["main"]["name"]
 
-        name = self.metadata["main"]["name"]
-
-        return name
 
     def get_collection_uri(self):
         """Getter for the collection URI, as constructed."""
 
         self.load_collection_metadata()
         #https%3A%2F%2Fwebarchive.nla.gov.au%2Fcollection%2F15003
-
-        uri = self.metadata["main"]["collection_uri"]
-
-        return uri
+        #Should we return the value as extracted or fix the encoding?
+        return self.metadata["main"]["collection_uri"]
 
     def get_subject(self):
-        """Getter for the collection's topics, as scraped."""
+        """Getter for the collection's topics, collection name of the superclass"""
         
         self.load_collection_metadata()
-
-        subjects = self.metadata["main"]["subject"]
-
-        return subjects
+        return self.metadata["main"]["subject"]
 
     def get_archived_since(self):
-        """Getter for the collection's archived since field, as scraped."""
+        """Getter for the collection's archived since field"""
 
         self.load_collection_metadata()
-
-        archived_since = self.metadata["main"]["archived_since"]
-
-        return archived_since
+        return self.metadata["main"]["archived_since"]
 
 
     def get_archived_until(self):
-        """Getter for the collection's archived since field, as scraped."""
+        """Getter for the collection's archived until field"""
 
         self.load_collection_metadata()
-
-        archived_since = self.metadata["main"]["archived_until"]
-
-        return archived_since
+        return self.metadata["main"]["archived_until"]
 
     def get_collectedby(self):
-        """Getter for the collecting organization's name, as scraped."""
+        """Getter for the collecting organization's name"""
 
         self.load_collection_metadata()
         #List of agencies
-        collectedby = self.metadata["main"]["institution_info"]
+        return self.metadata["main"]["institution_info"]
 
-        return collectedby
-
-    def get_collection_type(self):
-        """Getter for the collecting organization's name, as scraped."""
+    def list_seed_uris(self):
+        """Lists the seed URIs of an NLA collection."""
 
         self.load_collection_metadata()
-        #List of agencies
-        collectedby = self.metadata["main"]["collection_type"]
+        return self.metadata["main"]["seed_uris"] 
+        
+    def list_memento_urims(self):
+        """Lists the memento URIMs of an NLA collection."""
 
-        return collectedby  
+        self.load_collection_metadata()
+        return self.metadata["main"]["urims"]
