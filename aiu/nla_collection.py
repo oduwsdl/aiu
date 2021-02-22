@@ -70,12 +70,17 @@ def extract_main_collection_data(res):
 
     if len(subcollections) == 0:
         #This is a subcollection which contains mementos
-        data["collection_type"] = "L3 Subcollection - contains mementos"
+        #Breadcrumbs
+        breadcrumb = []
+        for b_id in range(0,len(breadcrumbs)):
+            c_id = breadcrumbs[b_id]["id"]
+            breadcrumb.append(c_id)
+        data["collection_type"] = ["L3 Subcollection - contains mementos", breadcrumb]
         agencies = json_data["agencies"]
         #agency_info = []
         agency = {}
         for p_id in range(0,len(agencies)):
-            name = agencies[p_id]["name"]
+            name = agencies[p_id]["name"]   
             uri = agencies[p_id]["url"]
             agency[name] = uri
         data["institution_info"] = agency
@@ -92,7 +97,11 @@ def extract_main_collection_data(res):
     else: #This is a supercollection or collection which contains subcollections
         if len(breadcrumbs) == 1:
             #This is a supercollection which contains collections
-            data["collection_type"] = "L1 Supercollection - contains collections"
+            breadcrumb = []
+            for b_id in range(0,len(breadcrumbs)):
+                c_id = breadcrumbs[b_id]["id"]
+                breadcrumb.append(c_id)
+            data["collection_type"] = ["L1 Supercollection - contains collections",breadcrumb]
             data["subject"] = data["name"] #same as the collection name
             supercollection_seed_uris = []
             supercollection_urims = []
@@ -112,7 +121,11 @@ def extract_main_collection_data(res):
 
         if len(breadcrumbs) == 2:
             #This is a collection which contains subcollections 
-            data["collection_type"] = "L2 Collection - contains subcollections"
+            breadcrumb = []
+            for b_id in range(0,len(breadcrumbs)):
+                c_id = breadcrumbs[b_id]["id"]
+                breadcrumb.append(c_id)            
+            data["collection_type"] = ["L2 Collection - contains subcollections", breadcrumb]
             data["subject"] = breadcrumbs[1]["name"] #supercollection name
             data["archived_since"] = json_data["startDate"]["monthyear"] #other formats available
             data["archived_until"] = json_data["endDate"]["monthyear"] #other formats available
