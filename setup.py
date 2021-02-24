@@ -38,7 +38,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url='https://github.com/oduwsdl/archiveit_utilities',
-    author='Shawn M. Jones',
+    author='Shawn M. Jones, Himarsha Jayanetti',
     author_email='jones.shawn.m@gmail.com',
     license='MIT',
     packages=['aiu'],
