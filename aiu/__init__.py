@@ -1,4 +1,5 @@
 from .archiveit_collection import ArchiveItCollection, ArchiveItCollectionException
+from .nla_collection import NLACollection, NLACollectionException
 from .timemap import convert_LinkTimeMap_to_dict, MalformedLinkFormatTimeMap
 from .archive_information import generate_raw_urim
 from .utils import generate_archiveit_urits, process_timemaps_for_mementos, discover_raw_urims, get_uri_responses
@@ -8,8 +9,7 @@ from .version import name, version, user_agent_string
 __all__ = [ "ArchiveItCollection", "ArchiveItCollectionException",
     "convert_LinkTimeMap_to_dict", "MalformedLinkFormatTimeMap",
     "generate_raw_urim", "generate_archiveit_urits", "process_timemaps_for_mementos",
-    "discover_raw_urims", "get_uri_responses", "version", "name", "user_agent_string"
-]
+    "discover_raw_urims", "get_uri_responses", "version", "name", "user_agent_string", "NLACollection" ]
 
 import logging
 try:  # Python 2.7+
