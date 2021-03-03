@@ -1,6 +1,6 @@
 [![Build Status](https://travis-ci.org/oduwsdl/aiu.svg?branch=master)](https://travis-ci.org/oduwsdl/aiu)
 
-# AIU (formerly Archive-It Utilities)
+# AIU
 
 AIU is a Python library for extracting information from Archive-It collections. Most work is currently done through a single class `ArchiveItCollection`, which performs screen-scraping in order to acquire general collection metadata, seed lists, and seed metadata.
 
