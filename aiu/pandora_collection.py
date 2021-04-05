@@ -35,6 +35,8 @@ pandora_col_prefix ="http://pandora.nla.gov.au/col/"
 
 pandora_sub_prefix ="http://pandora.nla.gov.au/subject/"
 
+trove_tep_prefix = "https://webarchive.nla.gov.au/tep/"
+
 
 class PandoraCollectionException(Exception):
     """An exception class to be used by the functions in this file so that the
@@ -207,7 +209,24 @@ class PandoraCollection:
         #print(self.metadata["main"]["urims"])
         return self.metadata["main"]["urims"]
 
-def extract_main_subject_data(soup):
+def get_list_from_ul(uls,pandora_prefix):
+    dic = {}
+    for ul in uls:
+        ids = []
+        newsoup = BeautifulSoup(str(ul), 'html.parser')
+        lis = newsoup.find_all('li')
+        for li in lis:
+            a_tag = li.find('a')
+            href = a_tag['href']
+            id = href.split("/")[2]
+            url = pandora_prefix + id
+            text = li.text
+            ids.append(id)
+            dic[id] = (url,text)
+    return dic
+
+
+def extract_main_subject_data(soup,subject_id):
     """Obtain general collection metadata different types of Trove collections contains using the json response.
     """
     data = {}
@@ -223,39 +242,50 @@ def extract_main_subject_data(soup):
             return data  
         else:
             raise IndexError("Could not find 'THIS PAGE CANNOT BE FOUND' string using screen scraping")
-    # itemlist = soup.find_all('div', {"class": "itemlist"})
-    # uls = itemlist[0].find('ul')
-    # tep = {}
-    # tep_ids = []
-    # for ul in uls:
-    #     newsoup = BeautifulSoup(str(ul), 'html.parser')
-    #     lis = newsoup.find_all('li')
-    #     for li in lis:
-    #         a_tag = li.find('a')
-    #         tep_href = a_tag['href']
-    #         tep_id = tep_href.split("/")[2]
-    #         tep_url = trove_prefix + tep_href
-    #         text = li.text
-    #         tep_ids.append(tep_id)
-    #         tep[tep_id] = (tep_url,text)
-    # data["tep"] = tep
-    # #print(tep)
-    # seed_uris = []
-    # urims = []
-    # main_dic = {}
-    # for tep_id in tep_ids:
-    #     tep_json_uri = tep_json_prefix + tep_id
-    #     tep_dic = get_metadata_from_tep(requests.get(tep_json_uri),data)
-    #     seed_uri = tep_dic["seed_uri"]
-    #     mementos = tep_dic["urims"]
-    #     urims.extend(mementos) 
-    #     seed_uris.append(seed_uri)
-
-    #     main_dic[tep_id] = tep_dic
-    # #print(main_dic)
-    # data["seed_uris"] = seed_uris
-    # data["urims"] = urims
-    # #print(urims)
+    
+    #First page
+    subcategories = soup.find_all('div', {"class": "subcategories"})
+    subcat_uls = subcategories[0].find('ul')
+    data["subcategories"]  = get_list_from_ul(subcat_uls,pandora_sub_prefix)
+    itemlist = soup.find_all('div', {"class": "itemlist"})
+    col_uls = itemlist[0].find('ul')
+    data["collections"]  = get_list_from_ul(col_uls,pandora_col_prefix)
+    tep_uls = itemlist[1].find('ul')
+    tep_dic_all = get_list_from_ul(tep_uls,trove_tep_prefix)
+    #Every other page
+    div_nav = soup.find_all('div', {"class": "itemnavigation"})
+    a_tags = div_nav[1].find_all('a', {"class": "alphabetical"})
+    n_pages = len(a_tags) + 2 #Taking the first page and start of list index is 0 into account
+    pag_url_prefix = pandora_sub_prefix + subject_id + "/"
+    for i in range(2,n_pages):
+        pag_url = pag_url_prefix + str(i)
+        #print(pag_url)
+        page_response = requests.get(pag_url)
+        page_soup = BeautifulSoup(page_response.text, "lxml")
+        items = page_soup.find_all('div', {"class": "itemlist"})
+        teps = items[1].find('ul')
+        #print(teps)
+        new_tep_dic = get_list_from_ul(teps,trove_tep_prefix)
+        #print(new_tep_dic)
+        tep_dic_all.update(new_tep_dic)
+    #print(tep_dic_all)
+    data["tep"] = tep_dic_all
+    seed_uris = []
+    urims = []
+    main_dic = {}
+    for tep_id in tep_dic_all:
+        #print(tep_id)
+        tep_json_uri = tep_json_prefix + tep_id
+        tep_dic = get_metadata_from_tep(requests.get(tep_json_uri),data)
+        seed_uri = tep_dic["seed_uri"]
+        mementos = tep_dic["urims"]
+        urims.extend(mementos) 
+        seed_uris.append(seed_uri)
+        main_dic[tep_id] = tep_dic
+    #print(main_dic)
+    data["seed_uris"] = seed_uris
+    data["urims"] = urims
+    #print(urims)
     return data
 
 
@@ -287,7 +317,7 @@ class PandoraSubject:
         #print(self.collection_tep_uri)
         if not self.metadata_loaded:
             soup = BeautifulSoup(self.firstpage_response.text, 'html5lib')
-            self.metadata["main"] = extract_main_subject_data(soup)
+            self.metadata["main"] = extract_main_subject_data(soup,self.subject_id)
             #self.metadata["optional"] = extract_optional_collection_data(self.session.get(self.collection_json_uri))
             self.metadata_loaded = True
 
@@ -304,21 +334,21 @@ class PandoraSubject:
         self.load_subject_metadata()
         return self.metadata["main"]["name"]
 
-    # def get_title_pages(self):
-    #     """Getter for the collection name, as scraped."""
+    def get_title_pages(self):
+        """Getter for the TEP pages, as scraped."""
 
-    #     self.load_collection_metadata()
-    #     return self.metadata["main"]["tep"]
+        self.load_subject_metadata()
+        return self.metadata["main"]["tep"]
 
-    # def list_seed_uris(self):
-    #     """Lists the seed URIs of an NLA Trove collection."""
+    def list_seed_uris(self):
+        """Lists the seed URIs of an NLA Trove collection."""
 
-    #     self.load_collection_metadata()
-    #     return self.metadata["main"]["seed_uris"] 
+        self.load_subject_metadata()
+        return self.metadata["main"]["seed_uris"] 
 
-    # def list_memento_urims(self):
-    #     """Lists the memento URIMs of an NLA Trove collection."""
+    def list_memento_urims(self):
+        """Lists the memento URIMs of an NLA Trove collection."""
 
-    #     self.load_collection_metadata()
-    #     #print(self.metadata["main"]["urims"])
-    #     return self.metadata["main"]["urims"]
+        self.load_subject_metadata()
+        #print(self.metadata["main"]["urims"])
+        return self.metadata["main"]["urims"]
