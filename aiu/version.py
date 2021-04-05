@@ -1,5 +1,5 @@
 __name__ = "aiu"
-__version__ = "0.2.1"
+__version__ = "0.2.2dev0"
 
 name = __name__
 version = __version__
