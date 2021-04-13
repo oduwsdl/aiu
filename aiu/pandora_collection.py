@@ -63,17 +63,20 @@ def extract_main_collection_data(soup):
     uls = itemlist[0].find('ul')
     tep = {}
     tep_ids = []
-    for ul in uls:
-        newsoup = BeautifulSoup(str(ul), 'html.parser')
-        lis = newsoup.find_all('li')
-        for li in lis:
-            a_tag = li.find('a')
-            tep_href = a_tag['href']
-            tep_id = tep_href.split("/")[2]
-            tep_url = trove_prefix + tep_href
-            text = li.text
-            tep_ids.append(tep_id)
-            tep[tep_id] = (tep_url,text)
+    for i in range(0,len(itemlist)):
+        uls = itemlist[i].find('ul')
+        #*****Sub-collection names?*****
+        for ul in uls:
+            newsoup = BeautifulSoup(str(ul), 'html.parser')
+            lis = newsoup.find_all('li')
+            for li in lis:
+                a_tag = li.find('a')
+                tep_href = a_tag['href']
+                tep_id = tep_href.split("/")[2]
+                tep_url = trove_prefix + tep_href
+                text = li.text
+                tep_ids.append(tep_id)
+                tep[tep_id] = (tep_url,text)
     data["tep"] = tep
     #print(tep)
     seed_uris = []
@@ -234,7 +237,7 @@ def extract_main_subject_data(soup,subject_id):
         title_list = soup.find_all('span', {"class": "selectedTitle"})
         n = len(title_list)
         data["name"]  = title_list[n-1].text
-        data["exists"] = True
+        data["exists"] = True   
     except:
         div = soup.find('div',id="content")
         if "THIS PAGE CANNOT BE FOUND" in div.find_all("h5")[0].get_text():
@@ -243,15 +246,30 @@ def extract_main_subject_data(soup,subject_id):
         else:
             raise IndexError("Could not find 'THIS PAGE CANNOT BE FOUND' string using screen scraping")
     
-    #First page
-    subcategories = soup.find_all('div', {"class": "subcategories"})
-    subcat_uls = subcategories[0].find('ul')
-    data["subcategories"]  = get_list_from_ul(subcat_uls,pandora_sub_prefix)
+    ##First page
+
+    #subcategories
+    try:
+        subcategories = soup.find_all('div', {"class": "subcategories"})
+        subcat_uls = subcategories[0].find('ul')
+        subcategories_dic  = get_list_from_ul(subcat_uls,pandora_sub_prefix)
+        data["subcategories"] = list(subcategories_dic.keys())
+    except:
+        data["subcategories"] = []
+
     itemlist = soup.find_all('div', {"class": "itemlist"})
-    col_uls = itemlist[0].find('ul')
-    data["collections"]  = get_list_from_ul(col_uls,pandora_col_prefix)
-    tep_uls = itemlist[1].find('ul')
+    #print(len(itemlist))
+    #collections
+    if len(itemlist) > 1:
+        col_uls = itemlist[0].find('ul')
+        collections_dic  = get_list_from_ul(col_uls,pandora_col_prefix)
+        data["collections"] = list(collections_dic.keys())
+        tep_uls = itemlist[1].find('ul')
+    else:
+        data["collections"] = []
+        tep_uls = itemlist[0].find('ul')
     tep_dic_all = get_list_from_ul(tep_uls,trove_tep_prefix)
+
     #Every other page
     div_nav = soup.find_all('div', {"class": "itemnavigation"})
     a_tags = div_nav[1].find_all('a', {"class": "alphabetical"})
@@ -261,9 +279,12 @@ def extract_main_subject_data(soup,subject_id):
         pag_url = pag_url_prefix + str(i)
         #print(pag_url)
         page_response = requests.get(pag_url)
-        page_soup = BeautifulSoup(page_response.text, "lxml")
+        page_soup = BeautifulSoup(page_response.text, "html5lib")
         items = page_soup.find_all('div', {"class": "itemlist"})
-        teps = items[1].find('ul')
+        if len(itemlist) > 1:
+            teps = items[1].find('ul')
+        else:
+            teps = items[0].find('ul')
         #print(teps)
         new_tep_dic = get_list_from_ul(teps,trove_tep_prefix)
         #print(new_tep_dic)
@@ -277,8 +298,14 @@ def extract_main_subject_data(soup,subject_id):
         #print(tep_id)
         tep_json_uri = tep_json_prefix + tep_id
         tep_dic = get_metadata_from_tep(requests.get(tep_json_uri),data)
-        seed_uri = tep_dic["seed_uri"]
-        mementos = tep_dic["urims"]
+        #print(tep_json_uri)
+        #Some tep urls give server error subject 12, https://webarchive.nla.gov.au/bamboo-service/tep/75101
+        try:
+            seed_uri = tep_dic["seed_uri"]
+            mementos = tep_dic["urims"]
+        except:
+            seed_uri = []
+            mementos = []
         urims.extend(mementos) 
         seed_uris.append(seed_uri)
         main_dic[tep_id] = tep_dic
@@ -352,3 +379,17 @@ class PandoraSubject:
         self.load_subject_metadata()
         #print(self.metadata["main"]["urims"])
         return self.metadata["main"]["urims"]
+
+    def list_subcategories(self):
+        """Lists the memento URIMs of an NLA Trove collection."""
+
+        self.load_subject_metadata()
+        #print(self.metadata["main"]["urims"])
+        return self.metadata["main"]["subcategories"]
+
+    def list_collections(self):
+        """Lists the memento URIMs of an NLA Trove collection."""
+
+        self.load_subject_metadata()
+        #print(self.metadata["main"]["urims"])
+        return self.metadata["main"]["collections"]
