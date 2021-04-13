@@ -49,7 +49,7 @@ setup(
         'requests',
         'bs4',
         'html5lib',
-        'requests_cache'
+        'requests_cache==0.5.2' # this must be this version for our test cases to work
     ],
     # setup_requires=['nltk'],
     test_suite="tests",
