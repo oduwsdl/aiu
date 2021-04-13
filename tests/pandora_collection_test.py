@@ -45,7 +45,8 @@ class TestPandoraCollection(unittest.TestCase):
         aic = aiu.PandoraCollection(5260, session=session, logger=logger)
         seed_uris = aic.list_seed_uris()
         self.assertEqual(seed_uris, ['http://www.australianalps.ea.gov.au/', 'http://www.ea.gov.au/events/iym/index.html', 'http://www.environment.act.gov.au/'])
-    
+        session.close() 
+
     def test_list_memento_URIMs_5260(self):
         logger = logging.getLogger(__name__)
         requests_cache.install_cache(cachefile, backend='sqlite')
@@ -53,6 +54,7 @@ class TestPandoraCollection(unittest.TestCase):
         aic = aiu.PandoraCollection(5260, session=session, logger=logger)
         memento_urims = aic.list_memento_urims()
         self.assertEqual(memento_urims,['https://webarchive.nla.gov.au/awa/20020505140000/http://pandora.nla.gov.au/pan/24780/20020506-0000/www.australianalps.ea.gov.au/iym.html\n', 'https://webarchive.nla.gov.au/awa/20020507140000/http://pandora.nla.gov.au/pan/24777/20020508-0000/www.ea.gov.au/events/iym/index.html\n', 'https://webarchive.nla.gov.au/awa/20020715140000/http://pandora.nla.gov.au/pan/24781/20020716-0000/www.environment.act.gov.au/ie4/yourenvironmenthwp/iym.html'])
+        session.close() 
 
     def test_collection_4006(self):
         logger = logging.getLogger(__name__)
