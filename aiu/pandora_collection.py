@@ -81,19 +81,21 @@ def extract_main_collection_data(soup):
     #print(tep)
     seed_uris = []
     urims = []
+    institution_info = {}
     main_dic = {}
     for tep_id in tep_ids:
         tep_json_uri = tep_json_prefix + tep_id
         tep_dic = get_metadata_from_tep(requests.get(tep_json_uri),data)
         seed_uri = tep_dic["seed_uri"]
         mementos = tep_dic["urims"]
+        agencies = tep_dic["institution_info"]
         urims.extend(mementos) 
         seed_uris.append(seed_uri)
-
+        institution_info.update(agencies)
         main_dic[tep_id] = tep_dic
-    #print(main_dic)
     data["seed_uris"] = seed_uris
     data["urims"] = urims
+    data["institution_info"] = institution_info
     #print(urims)
     return data
     
@@ -162,11 +164,10 @@ class PandoraCollection:
         self.private = None
         self.exists = None
 
-        self.collection_uri = "{}/{}".format(pandora_col_prefix, collection_id)
+        self.collection_uri = "{}{}".format(pandora_col_prefix, collection_id)
         self.firstpage_response = self.session.get(self.collection_uri) 
 
         self.logger = logger or logging.getLogger(__name__)  
-        #self.session.close()
 
     def load_collection_metadata(self):
         """Loads collection metadata from an existing directory, if possible.
@@ -211,6 +212,13 @@ class PandoraCollection:
         self.load_collection_metadata()
         #print(self.metadata["main"]["urims"])
         return self.metadata["main"]["urims"]
+
+    def get_collectedby(self):
+        """Lists the Institutions/Agencies"""
+
+        self.load_collection_metadata()
+        #print(self.metadata["main"]["urims"])
+        return self.metadata["main"]["institution_info"]
 
 def get_list_from_ul(uls,pandora_prefix):
     dic = {}
@@ -293,6 +301,7 @@ def extract_main_subject_data(soup,subject_id):
     data["tep"] = tep_dic_all
     seed_uris = []
     urims = []
+    institution_info = {}
     main_dic = {}
     for tep_id in tep_dic_all:
         #print(tep_id)
@@ -303,15 +312,19 @@ def extract_main_subject_data(soup,subject_id):
         try:
             seed_uri = tep_dic["seed_uri"]
             mementos = tep_dic["urims"]
+            agencies = tep_dic["institution_info"]
         except:
             seed_uri = []
             mementos = []
+            agencies = []
         urims.extend(mementos) 
-        seed_uris.append(seed_uri)
+        seed_uris.append(seed_uri)        
+        institution_info.update(agencies)
         main_dic[tep_id] = tep_dic
     #print(main_dic)
     data["seed_uris"] = seed_uris
     data["urims"] = urims
+    data["institution_info"] = institution_info
     #print(urims)
     return data
 
@@ -330,7 +343,7 @@ class PandoraSubject:
         self.private = None
         self.exists = None
 
-        self.subject_uri = "{}/{}".format(pandora_sub_prefix, subject_id)
+        self.subject_uri = "{}{}".format(pandora_sub_prefix, subject_id)
         self.firstpage_response = self.session.get(self.subject_uri) 
 
         self.logger = logger or logging.getLogger(__name__)  
@@ -393,3 +406,10 @@ class PandoraSubject:
         self.load_subject_metadata()
         #print(self.metadata["main"]["urims"])
         return self.metadata["main"]["collections"]
+
+    def get_collectedby(self):
+        """Lists the Institutions/Agencies"""
+
+        self.load_subject_metadata()
+        #print(self.metadata["main"]["urims"])
+        return self.metadata["main"]["institution_info"]
