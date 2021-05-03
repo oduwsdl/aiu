@@ -37,26 +37,26 @@ class TroveCollectionException(Exception):
     """
     pass
 
-def extract_main_collection_data(res):
+def extract_main_collection_data(res,collection_id):
     """Obtain general collection metadata different types of Trove collections contains using the json response.
     """
     data = {}
     
     try:
         json_data = json.loads(res.text)
-        data["exists"] = True
+        data["exists"] = True             
     except Exception as e:
         try:
-            #HTTP ERROR 500 Problem accessing /bamboo-service/collection/12323. Reason: Server Error
-            if "Problem accessing /bamboo-service/collection/" in res.text:
+            response = requests.get("https://webarchive.nla.gov.au/collection/" + collection_id)
+            #print(response.text)
+            if "It looks like we don’t have a page for this collection." in response.text:
                 data["exists"] = False
                 return data
             else:
-                raise ValueError("Could not find 'Problem accessing /bamboo-service/collection/' string in response")
-
+                raise ValueError("Could not find 'It looks like we don’t have a page for this collection.' string in response")
         except IndexError as e:
-            logger.error("Failed to find collection name using screen scraping")
-            logger.error("Failed to determine if collection does not exist using screen scraping")
+            logger.error("Failed to find collection name")
+            logger.error("Failed to determine if collection does not exist")
             logger.error(metadata_tags)
             raise e
     #For all levels: Mandotory
@@ -153,7 +153,7 @@ class TroveCollection:
         """
 
         if not self.metadata_loaded:
-            self.metadata["main"] = extract_main_collection_data(self.session.get(self.collection_json_uri))
+            self.metadata["main"] = extract_main_collection_data(self.session.get(self.collection_json_uri), self.collection_id)
             #self.metadata["optional"] = extract_optional_collection_data(self.session.get(self.collection_json_uri))
             self.metadata_loaded = True
 
