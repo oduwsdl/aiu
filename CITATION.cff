@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Jones"
+  given-names: "Shawn"
+  orcid: "https://orcid.org/0000-0002-4372-870X"
+- family-names: "Jayanetti"
+  given-names: "Himarsha"
+  orcid: "https://orcid.org/0000-0003-4748-9176"
+- family-names: "Kelly"
+  given-names: "Mat"
+  orcid: "https://orcid.org/0000-0002-0236-7389"
+title: "AIU: A library for interacting with web archive collections at Archive-It, Trove, Pandora, and more."
+version: 0.2.3
+date-released: 2021-05-06
+url: "https://github.com/oduwsdl/aiu"
