@@ -103,24 +103,32 @@ def extract_main_collection_data(soup):
 
 def get_metadata_from_tep(res,data):
     tep = {}
+    #print(res.text)
     try:
         json_data = json.loads(res.text)
         #print(json_data)
         tep["exists"] = True
     except Exception as e:
+        #print(e)
         try:
             #HTTP ERROR 500 Problem accessing /bamboo-service/tep/12323. Reason: Server Error
             if "Problem accessing /bamboo-service/tep/" in res.text:
                 tep["exists"] = False
                 return tep
             else:
-                raise ValueError("Could not find 'Problem accessing /bamboo-service/collection/' string in response")
+                #print("TEP page error")
+                #raise ValueError("Could not find 'Problem accessing /bamboo-service/collection/' string in response")
+                tep["exists"] = False
+                return tep
 
         except IndexError as e:
-            logger.error("Failed to find collection name using screen scraping")
-            logger.error("Failed to determine if collection does not exist using screen scraping")
-            logger.error(metadata_tags)
-            raise e
+            #print("TEP page error")
+            #logger.error("Failed to find collection name using screen scraping")
+            #logger.error("Failed to determine if collection does not exist using screen scraping")
+            #logger.error(metadata_tags)
+            tep["exists"] = False
+            return tep
+
 
     tep["name"] = json_data["name"] 
     tep["tep_uri"] = json_data["tepUrl"]  
@@ -306,9 +314,15 @@ def extract_main_subject_data(soup,subject_id):
     for tep_id in tep_dic_all:
         #print(tep_id)
         tep_json_uri = tep_json_prefix + tep_id
+        #print(tep_json_uri)
+        # try:
         tep_dic = get_metadata_from_tep(requests.get(tep_json_uri),data)
         #print(tep_json_uri)
         #Some tep urls give server error subject 12, https://webarchive.nla.gov.au/bamboo-service/tep/75101
+        # except:
+        #     print(tep_json_uri)
+        #     tep_dic = {}
+
         try:
             seed_uri = tep_dic["seed_uri"]
             mementos = tep_dic["urims"]
@@ -321,6 +335,7 @@ def extract_main_subject_data(soup,subject_id):
         seed_uris.append(seed_uri)        
         institution_info.update(agencies)
         main_dic[tep_id] = tep_dic
+        #print("done: "+tep_id)
     #print(main_dic)
     data["seed_uris"] = seed_uris
     data["urims"] = urims

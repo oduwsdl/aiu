@@ -102,3 +102,6 @@ ENV/
 
 # VS code
 .vscode
+
+# Swap file
+.swp
