@@ -20,6 +20,7 @@ import logging
 import logging.config
 import argparse
 import csv
+import re
 import sys
 
 from io import StringIO
@@ -47,89 +48,110 @@ def scrape_main_collection_data(soup):
     data = {}
 
     metadata_tags = soup.find_all("div", "entity-meta")
+    metadata_tag = metadata_tags[0] if metadata_tags else soup.select_one(
+        "div.entity-header .entity-info"
+    )
+    heading = metadata_tag.find("h1") if metadata_tag else soup.find("h1")
 
-    try:
-        data["name"] = metadata_tags[0].find_all("h1")[0].get_text().strip()
-        data["exists"] = True
-    except IndexError:
-
-        try:
-
-            if "Not Found" in metadata_tags[0].find_all("h2")[0].get_text().strip():
-                data["exists"] = False
-                return data
-            else:
-                raise IndexError("Could not find 'Not Found' string using screen scraping")
-
-        except IndexError as e:
-            logger.error("Failed to find collection name using screen scraping")
-            logger.error("Failed to determine if collection does not exist using screen scraping")
-            logger.error(metadata_tags)
-            raise e
-
-    try:
-        data["collection_uri"] = metadata_tags[0].find_all("h1")[0].find_all("a")[0]["href"]
-    except IndexError as e:
-        logger.error("Failed to find collection URI using screen scraping")
+    if heading is None:
+        not_found = soup.find(string=re.compile("Not Found", re.IGNORECASE))
+        if not_found:
+            data["exists"] = False
+            return data
+        logger.error("Failed to find collection name using screen scraping")
+        logger.error("Failed to determine if collection does not exist using screen scraping")
         logger.error(metadata_tags)
-        raise e
+        raise IndexError("Could not find collection heading using screen scraping")
 
-    try:
-        data["institution_name"] = \
-            metadata_tags[0].find_all("p", "collectedBy")[0].get_text().strip().replace("Collected by:", "").strip()
-    except IndexError as e:
-        logger.error("Failed to find institution name using screen scraping")
-        logger.error(metadata_tags)
-        raise e
+    data["name"] = heading.get_text(" ", strip=True)
+    data["exists"] = True
 
-    try:
-        data["institution_uri"] = metadata_tags[0].find_all("p", "collectedBy")[0].find_all("a")[0]['href']
-    except IndexError as e:
-        logger.error("Failed to find institution URI using screen scraping")
-        logger.error(metadata_tags)
-        raise e
+    collection_link = heading.find("a")
+    if collection_link is None:
+        collection_link = soup.find(
+            "a", href=re.compile(r"^/collections/[0-9]+(?:[/?]|$)")
+        )
+    data["collection_uri"] = (
+        collection_link.get("href", "").split("?", 1)[0]
+        if collection_link
+        else None
+    )
 
-    try:
-        data["description"] = \
-            metadata_tags[0].find_all("p", "seamTextPara")[0].get_text().strip().replace('\n', '<br />')
-    except IndexError:
-        logger.warning("Failed to find description using screen scraping, "
-            "setting to No description...")
-        data["description"] = "No description."
+    data["institution_name"] = ""
+    data["institution_uri"] = ""
+    data["description"] = "No description."
+    data["archived_since"] = "unknown"
+    data["subject"] = []
+
+    collected_by = metadata_tag.find("p", "collectedBy") if metadata_tag else None
+    if collected_by is not None:
+        data["institution_name"] = collected_by.get_text().replace(
+            "Collected by:", ""
+        ).strip()
+        link = collected_by.find("a")
+        data["institution_uri"] = link.get("href", "") if link else ""
+
+    old_description = metadata_tag.find("p", "seamTextPara") if metadata_tag else None
+    if old_description is not None:
+        data["description"] = old_description.get_text().strip().replace(
+            "\n", "<br />"
+        )
+
+    for field in (metadata_tag.select(".result-field") if metadata_tag else []):
+        label_node = field.select_one(".field-label")
+        if label_node is None:
+            continue
+        label = label_node.get_text(" ", strip=True).rstrip(":").lower()
+        full_text = field.get_text(" ", strip=True)
+        label_text = label_node.get_text(" ", strip=True)
+        value = full_text[len(label_text):].lstrip(": ").strip()
+
+        if label == "collected by":
+            link = field.find("a")
+            data["institution_name"] = link.get_text(" ", strip=True) if link else value
+            data["institution_uri"] = link.get("href", "") if link else ""
+        elif label == "archived since":
+            data["archived_since"] = value
+        elif label == "description":
+            data["description"] = value.replace("\n", "<br />")
+        elif label == "subject":
+            subjects = [link.get_text(" ", strip=True) for link in field.find_all("a")]
+            data["subject"] = subjects or [value]
+
+    if metadata_tag is not None:
+        for item in metadata_tag.find_all("p"):
+            bolds = item.find_all("b")
+            if not bolds:
+                continue
+            key = bolds[0].get_text().strip().rstrip(":")
+            value = (
+                item.get_text()
+                .replace("{}:".format(key), "")
+                .replace("\xa0", "")
+                .replace("\t", "")
+                .strip()
+            )
+            if key == "Subject":
+                data["subject"] = [i.strip(", ") for i in value.split("\n") if i.strip()]
+            elif key == "Archived since" and value:
+                data["archived_since"] = value.split("\n")[0].strip(", ")
 
     search_results = soup.find_all("div", {"id": "all-search-results"})
-
-    try:
-        public_stmt = search_results[0].find_all("h2")[0].get_text().strip()
-
-        if "There is no public content available for this Collection yet. Please check back soon!" in public_stmt:
-            data["public"] = "private"
-        else:
-            data["public"] = "public"
-
-    except IndexError:
-        data["public"] = "unknown" 
-
-    data["archived_since"] = "unknown"
-
-    subjects = []
-
-    for item in metadata_tags[0].find_all("p"):
-
-        bolds = item.find_all('b')
-
-        if len(bolds) > 0:
-
-            for bold in bolds:
-
-                if "Subject" in bold.get_text():
-                    subjects = [i.strip(',').strip() for i in item.text.replace('Subject:', '').replace('\xa0', '').replace('\t', '').strip().split('\n')]
-
-                if "Archived since" in bold.get_text():
-                    archived_since = [i.strip(',').strip() for i in item.text.replace('Archived since:', '').replace('\xa0', '').replace('\t', '').strip().split('\n')][0]
-
-    data["subject"] = subjects
-    data["archived_since"] = archived_since
+    page_text = soup.get_text(" ", strip=True)
+    if search_results and search_results[0].find("h2"):
+        public_stmt = search_results[0].find("h2").get_text(" ", strip=True)
+        data["public"] = (
+            "private"
+            if "There is no public content available for this Collection yet!" in public_stmt
+            or "There is no public content available for this Collection yet. Please check back soon!" in public_stmt
+            else "public"
+        )
+    elif "There is no public content available" in page_text:
+        data["public"] = "private"
+    elif soup.select_one(".result-item") is not None:
+        data["public"] = "public"
+    else:
+        data["public"] = "unknown"
 
     return data
 
@@ -177,6 +199,18 @@ def scrape_seed_metadata(soup):
                 title = entry.text.replace("Title:", "").strip()
                 itemdict["title"] = title
 
+        current_site_link = item.select_one("a.result-item-site-link")
+        if current_site_link is not None:
+            itemdict["uri"] = current_site_link.get_text(" ", strip=True)
+
+        current_heading = item.find("h2")
+        if current_heading is not None and current_heading.find("a") is not None:
+            heading_text = current_heading.find("a").get_text(" ", strip=True)
+            if "uri" not in itemdict and heading_text.startswith(("http://", "https://")):
+                itemdict["uri"] = heading_text
+        elif current_heading is not None and "title" not in itemdict:
+            itemdict["title"] = current_heading.get_text(" ", strip=True)
+
         for entry in item.find_all("p"):
             if len(entry.find_all("b")) > 0:
                 key = entry.find_all("b")[0].text.replace('\xa0', '').strip().rstrip(':')
@@ -184,7 +218,19 @@ def scrape_seed_metadata(soup):
                 values = [i.strip(',').strip() for i in entry.text.replace("{}:".format(key), '').replace('\xa0', '').replace('\t', '').strip().split('\n')]
                 itemdict[key.lower()] = values
 
-        data.append(itemdict)
+        for entry in item.select(".result-field"):
+            label_node = entry.select_one(".field-label")
+            if label_node is None:
+                continue
+            key = label_node.get_text(" ", strip=True).rstrip(":")
+            value = entry.get_text(" ", strip=True)
+            label_text = label_node.get_text(" ", strip=True)
+            value = value[len(label_text):].lstrip(": ").strip()
+            values = [link.get_text(" ", strip=True) for link in entry.find_all("a")]
+            itemdict[key.lower()] = values or [value]
+
+        if "uri" in itemdict:
+            data.append(itemdict)
 
     return data
 
@@ -193,12 +239,15 @@ def scrape_page_count(soup):
     BeautifulSoup object `soup`.
     """
 
-    try:
-        pagestring = soup.find_all("div", "paginator")[0].text
-        page_count = pagestring.split("of")[1].strip().split()[0]
-        page_count = page_count.replace(',', '')
-    except IndexError:
-        page_count = None
+    paginator = soup.select_one("div.paginator, div.pagination")
+    if paginator is None:
+        return None
+    match = re.search(
+        r"Page\s+[\d,]+\s+of\s+([\d,]+)",
+        paginator.get_text(" ", strip=True),
+        re.IGNORECASE,
+    )
+    page_count = match.group(1).replace(",", "") if match else None
 
     return page_count
 
@@ -207,13 +256,15 @@ def scrape_page_number(soup):
     BeautifulSoup object `soup`.
     """
 
-    try:
-        pagestring = soup.find_all("div", "paginator")[0].text
-        print("pagestring: {}".format(pagestring))
-        page_number = pagestring.split("of")[0].strip().split()[1]
-        page_number = page_number.replace(',', '')
-    except IndexError:
-        page_number = None
+    paginator = soup.select_one("div.paginator, div.pagination")
+    if paginator is None:
+        return None
+    match = re.search(
+        r"Page\s+([\d,]+)\s+of\s+[\d,]+",
+        paginator.get_text(" ", strip=True),
+        re.IGNORECASE,
+    )
+    page_number = match.group(1).replace(",", "") if match else None
 
     return page_number
 
@@ -222,13 +273,15 @@ def scrape_result_count(soup):
     BeautifulSoup object `soup`.
     """
 
-    try:
-        pagestring = soup.find_all("div", "paginator")[0].text
-        result_count = pagestring[pagestring.find('(') + 1:].replace(' Total Results', '').rstrip(')')
-        result_count = pagestring[pagestring.find('(') + 1:pagestring.find(' Total Results')]
-        result_count = result_count.replace(',', '')
-    except IndexError:
-        result_count = None
+    paginator = soup.select_one("div.paginator, div.pagination")
+    if paginator is None:
+        return None
+    match = re.search(
+        r"\(([\d,]+)\s+total results\)",
+        paginator.get_text(" ", strip=True),
+        re.IGNORECASE,
+    )
+    result_count = match.group(1).replace(",", "") if match else None
 
     return result_count
 
@@ -240,11 +293,14 @@ def scrape_next_page_number(soup):
 
     nextpage = None
 
-    nextpagematch = soup.find_all('a', {'id': 'pageNext'})
+    nextpagematch = soup.select('a#pageNext, a[aria-label="next page"]')
 
-    if len(nextpagematch) == 2:
-        nextpage_uri = nextpagematch[0]['href'] 
-        nextpage = nextpage_uri[nextpage_uri.find('page='):][:nextpage_uri.find('&') - 1].replace("page=", "") 
+    for next_link in nextpagematch:
+        nextpage_uri = next_link.get("href", "")
+        match = re.search(r"[?&]page=(\d+)", nextpage_uri)
+        if match:
+            nextpage = match.group(1)
+            break
 
     return nextpage
 
@@ -264,19 +320,46 @@ def get_seed_metadata_from_seed_report(collection_id, session):
         "show_field=publicly_visible&sort=-id".format(collection_id)
 
     r = session.get(seed_report_uri, headers={'user-agent': user_agent_string})
+    if hasattr(r, "raise_for_status"):
+        r.raise_for_status()
 
     seed_report = StringIO(r.text)
     
     csvreader = csv.DictReader(seed_report, delimiter=',')
 
+    fieldnames = csvreader.fieldnames or []
+    columns = {
+        name.lower().replace(" ", "_"): name for name in fieldnames
+    }
+
+    def find_column(*names):
+        for name in names:
+            column = columns.get(name.lower().replace(" ", "_"))
+            if column:
+                return column
+        return None
+
+    url_column = find_column("Seed URL", "url")
+    if url_column is None:
+        logger.warning("Archive-It seed report has no URL column: %s", fieldnames)
+        return seed_metadata
+
+    metadata_columns = {
+        "group": find_column("Group", "seed_group__name"),
+        "status": find_column("Status", "active"),
+        "frequency": find_column("Frequency", "crawl_definition__recurrence_type"),
+        "type": find_column("Type", "seed_type"),
+        "access": find_column("Access", "publicly_visible"),
+    }
+
     for row in csvreader:
-    
-        seed_metadata[ row["Seed URL"] ] = {} 
-        seed_metadata[ row["Seed URL"] ]["group"] = row["Group"]
-        seed_metadata[ row["Seed URL"] ]["status"] = row["Status"]
-        seed_metadata[ row["Seed URL"] ]["frequency"] = row["Frequency"]
-        seed_metadata[ row["Seed URL"] ]["type"] = row["Type"]
-        seed_metadata[ row["Seed URL"] ]["access"] = row["Access"]
+        uri = (row.get(url_column) or "").strip()
+        if not uri:
+            continue
+        seed_metadata[uri] = {
+            key: row.get(column, "") if column else ""
+            for key, column in metadata_columns.items()
+        }
 
     return seed_metadata 
 
@@ -310,6 +393,10 @@ class ArchiveItCollection:
             soup = BeautifulSoup(self.firstpage_response.text, 'html5lib')
 
             self.metadata["main"] = scrape_main_collection_data(soup)
+            if self.metadata["main"].get("exists") and not self.metadata["main"].get("collection_uri"):
+                self.metadata["main"]["collection_uri"] = "/collections/{}".format(
+                    self.collection_id
+                )
             self.metadata["optional"] = scrape_optional_collection_data(soup)
 
             self.metadata_loaded = True
@@ -347,9 +434,14 @@ class ArchiveItCollection:
 
             while nextpage:
 
-                page_uri = "{}/{}/?page={}&totalResultCount={}".format(
-                    collection_uri_prefix, self.collection_id, 
-                    nextpage, result_count)
+                if soup.select_one("div.pagination") is not None:
+                    page_uri = "{}/{}?page={}&totalResultCount={}".format(
+                        collection_uri_prefix, self.collection_id,
+                        nextpage, result_count)
+                else:
+                    page_uri = "{}/{}/?page={}&totalResultCount={}".format(
+                        collection_uri_prefix, self.collection_id,
+                        nextpage, result_count)
 
                 r = self.session.get(page_uri)
 
@@ -370,8 +462,9 @@ class ArchiveItCollection:
 
                 self.seed_metadata.setdefault("seeds", {})
                 self.seed_metadata["seeds"].setdefault(uri, {})
-                self.seed_metadata["seeds"][uri].setdefault(
-                    "collection_web_pages", []).append(itemdict)
+                if itemdict:
+                    self.seed_metadata["seeds"][uri].setdefault(
+                        "collection_web_pages", []).append(itemdict)
 
             seed_report_metadata = get_seed_metadata_from_seed_report(self.collection_id, self.session)
             seed_report_timestamp = datetime.now()
@@ -595,4 +688,3 @@ class ArchiveItCollection:
 
         with open(filename, 'w') as metadata_file:
             json.dump(collection_metadata, metadata_file, indent=4)
-
